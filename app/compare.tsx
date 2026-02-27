@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
+import { useTranslation } from '@/i18n';
 import SearchBar from '@/components/SearchBar';
 import LoadingState from '@/components/LoadingState';
 
 export default function CompareScreen() {
+  const t = useTranslation();
   const [wine1, setWine1] = useState('');
   const [wine2, setWine2] = useState('');
   const [result, setResult] = useState<any>(null);
@@ -25,7 +27,7 @@ export default function CompareScreen() {
         setResult(data);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur');
+      setError(err instanceof Error ? err.message : t.common.error);
     } finally {
       setLoading(false);
     }
@@ -33,14 +35,14 @@ export default function CompareScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>⚖️ Comparer deux vins</Text>
+      <Text style={styles.title}>{t.compare.title}</Text>
 
-      <SearchBar value={wine1} onChangeText={setWine1} placeholder="Premier vin (nom ou code SAQ)" />
+      <SearchBar value={wine1} onChangeText={setWine1} placeholder={t.compare.wine1Placeholder} />
       <Text style={styles.vs}>VS</Text>
-      <SearchBar value={wine2} onChangeText={setWine2} placeholder="Deuxième vin (nom ou code SAQ)" />
+      <SearchBar value={wine2} onChangeText={setWine2} placeholder={t.compare.wine2Placeholder} />
 
       <Pressable onPress={doCompare} style={[styles.compareBtn, (!wine1 || !wine2) && { opacity: 0.5 }]}>
-        <Text style={styles.compareBtnText}>Comparer</Text>
+        <Text style={styles.compareBtnText}>{t.compare.compareButton}</Text>
       </Pressable>
 
       {loading && <LoadingState />}
@@ -61,7 +63,7 @@ export default function CompareScreen() {
                 <Text style={styles.wineInfo}>{w.type} · {w.country}</Text>
                 <Text style={styles.wineInfo}>{(w.grapes || []).join(', ')}</Text>
                 <View style={[styles.scoreBadge, { backgroundColor: w.dealScore >= 88 ? COLORS.gold : COLORS.grayLight }]}>
-                  <Text style={styles.scoreText}>Score: {w.dealScore}</Text>
+                  <Text style={styles.scoreText}>{t.compare.score}: {w.dealScore}</Text>
                 </View>
               </View>
             ))}

@@ -5,6 +5,10 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { FavoritesProvider } from '@/context/FavoritesContext';
+import { SettingsProvider } from '@/context/SettingsContext';
+import { SearchHistoryProvider } from '@/context/SearchHistoryContext';
+import { CellarProvider } from '@/context/CellarContext';
+import { TasteProfileProvider } from '@/context/TasteProfileContext';
 import { COLORS } from '@/constants/theme';
 import 'react-native-reanimated';
 
@@ -33,19 +37,33 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
-    <FavoritesProvider>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: COLORS.burgundy },
-          headerTintColor: COLORS.white,
-          headerTitleStyle: { fontWeight: '700' },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="wine/[id]" options={{ title: 'Détails du vin' }} />
-        <Stack.Screen name="compare" options={{ title: 'Comparer', presentation: 'modal' }} />
-      </Stack>
-    </FavoritesProvider>
+    <SettingsProvider>
+      <FavoritesProvider>
+        <SearchHistoryProvider>
+          <CellarProvider>
+            <TasteProfileProvider>
+              <StatusBar style="light" />
+              <Stack
+                screenOptions={{
+                  headerStyle: { backgroundColor: COLORS.burgundy },
+                  headerTintColor: COLORS.white,
+                  headerTitleStyle: { fontWeight: '700' },
+                }}
+              >
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="wine/[id]" options={{ title: 'Détails du vin' }} />
+                <Stack.Screen name="compare" options={{ title: 'Comparer', presentation: 'modal' }} />
+                <Stack.Screen name="settings" options={{ title: 'Réglages' }} />
+                <Stack.Screen name="cellar" options={{ title: 'Ma cave' }} />
+                <Stack.Screen name="quiz" options={{ title: 'Quiz', presentation: 'modal' }} />
+                <Stack.Screen name="camera" options={{ title: 'Scanner', headerShown: false }} />
+                <Stack.Screen name="menu-scan" options={{ title: 'Menu' }} />
+                <Stack.Screen name="map" options={{ title: 'Carte des vins' }} />
+              </Stack>
+            </TasteProfileProvider>
+          </CellarProvider>
+        </SearchHistoryProvider>
+      </FavoritesProvider>
+    </SettingsProvider>
   );
 }

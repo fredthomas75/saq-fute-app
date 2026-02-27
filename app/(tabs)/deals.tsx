@@ -3,6 +3,7 @@ import { View, Text, FlatList, ScrollView, Pressable, StyleSheet } from 'react-n
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
 import type { Wine } from '@/types/wine';
+import { useTranslation } from '@/i18n';
 import WineCard from '@/components/WineCard';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
@@ -10,6 +11,7 @@ import EmptyState from '@/components/EmptyState';
 const BUDGETS = [15, 20, 25, 30, 50];
 
 export default function DealsScreen() {
+  const t = useTranslation();
   const [budget, setBudget] = useState<number>(25);
   const [coeurs, setCoeurs] = useState<Wine[]>([]);
   const [deals, setDeals] = useState<Wine[]>([]);
@@ -30,16 +32,16 @@ export default function DealsScreen() {
       setDeals(dealsRes.wines);
       setPromos(promoRes.wines);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur');
+      setError(err instanceof Error ? err.message : t.common.error);
     } finally {
       setLoading(false);
     }
-  }, [budget]);
+  }, [budget, t]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  if (loading) return <LoadingState message="Chargement des deals..." />;
-  if (error) return <EmptyState icon="cloud-offline-outline" message="Erreur" submessage={error} onRetry={fetchAll} />;
+  if (loading) return <LoadingState message={t.deals.loading} />;
+  if (error) return <EmptyState icon="cloud-offline-outline" message={t.deals.error} submessage={error} onRetry={fetchAll} />;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -55,7 +57,7 @@ export default function DealsScreen() {
       {/* Coups de Cœur */}
       {coeurs.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>❤️ Coups de Cœur</Text>
+          <Text style={styles.sectionTitle}>{t.deals.coupDeCoeur}</Text>
           <FlatList
             horizontal
             data={coeurs}
@@ -69,9 +71,9 @@ export default function DealsScreen() {
 
       {/* Top Deals */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🔥 Top Deals sous {budget}$</Text>
+        <Text style={styles.sectionTitle}>{t.deals.topDeals} {budget}$</Text>
         {deals.length === 0 ? (
-          <Text style={styles.emptyText}>Aucun deal pour ce budget</Text>
+          <Text style={styles.emptyText}>{t.deals.noDeal}</Text>
         ) : (
           deals.map((wine) => <WineCard key={wine.id} wine={wine} />)
         )}
@@ -80,7 +82,7 @@ export default function DealsScreen() {
       {/* En promo */}
       {promos.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🏷️ En promo</Text>
+          <Text style={styles.sectionTitle}>{t.deals.onSale}</Text>
           <FlatList
             horizontal
             data={promos}

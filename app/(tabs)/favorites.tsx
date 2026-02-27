@@ -2,11 +2,13 @@ import React from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import { COLORS, SPACING } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
+import { useTranslation } from '@/i18n';
 import WineCard from '@/components/WineCard';
 import EmptyState from '@/components/EmptyState';
 import type { Wine } from '@/types/wine';
 
 export default function FavoritesScreen() {
+  const t = useTranslation();
   const { favorites } = useFavorites();
 
   if (favorites.length === 0) {
@@ -14,8 +16,8 @@ export default function FavoritesScreen() {
       <View style={styles.container}>
         <EmptyState
           icon="heart-outline"
-          message="Aucun favori"
-          submessage="Appuie sur le ❤️ d'un vin pour le sauvegarder ici"
+          message={t.favorites.empty}
+          submessage={t.favorites.emptySub}
         />
       </View>
     );
