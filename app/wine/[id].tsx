@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Linking, Share, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, Linking, Share, TextInput, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useCellar } from '@/context/CellarContext';
+import { useWishlist } from '@/context/WishlistContext';
+import { useWineNotes } from '@/context/WineNotesContext';
 import { useTranslation } from '@/i18n';
 import type { Wine } from '@/types/wine';
 import LoadingState from '@/components/LoadingState';
@@ -17,10 +19,17 @@ export default function WineDetailScreen() {
   const router = useRouter();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { isInCellar, addToCellar } = useCellar();
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
+  const { getNote, setNote } = useWineNotes();
   const [wine, setWine] = useState<Wine | null>(null);
   const [conseil, setConseil] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [noteRating, setNoteRating] = useState(0);
+
+  const existingNote = getNote(id || '');
 
   useEffect(() => {
     if (!id) return;
@@ -33,11 +42,34 @@ export default function WineDetailScreen() {
     }).finally(() => setLoading(false));
   }, [id]);
 
+  useEffect(() => {
+    if (existingNote) {
+      setNoteText(existingNote.note);
+      setNoteRating(existingNote.rating || 0);
+    }
+  }, [existingNote?.dateModified]);
+
   if (loading) return <LoadingState message={t.wineDetail.loading} />;
   if (error || !wine) return <EmptyState icon="alert-circle-outline" message={t.wineDetail.notFound} submessage={error || ''} />;
 
   const fav = isFavorite(wine.id);
   const inCellar = isInCellar(wine.id);
+  const wished = isInWishlist(wine.id);
+
+  const handleSaveNote = () => {
+    if (noteText.trim() || noteRating > 0) {
+      setNote(wine.id, wine.name, noteText.trim(), noteRating || undefined);
+    }
+    setEditingNote(false);
+  };
+
+  const handleRating = (star: number) => {
+    const newRating = star === noteRating ? 0 : star;
+    setNoteRating(newRating);
+    if (noteText.trim() || newRating > 0) {
+      setNote(wine.id, wine.name, noteText.trim(), newRating || undefined);
+    }
+  };
 
   const handleShare = async () => {
     const dealInfo = wine.onSale && wine.dealLabel ? ` (${wine.dealLabel})` : '';
@@ -142,12 +174,63 @@ export default function WineDetailScreen() {
           <Text style={styles.secondaryText}>{t.wineDetail.share}</Text>
         </Pressable>
 
+        <Pressable onPress={() => wished ? removeFromWishlist(wine.id) : addToWishlist(wine)} style={[styles.secondaryBtn, wished && styles.secondaryBtnActive]}>
+          <Ionicons name={wished ? 'bookmark' : 'bookmark-outline'} size={18} color={wished ? COLORS.gold : COLORS.burgundy} />
+          <Text style={[styles.secondaryText, wished && { color: COLORS.gold }]}>
+            {wished ? (t.wishlist?.inList || 'Dans ma liste') : (t.wishlist?.add || 'À essayer')}
+          </Text>
+        </Pressable>
+
         <Pressable onPress={() => !inCellar && addToCellar(wine)} style={[styles.secondaryBtn, inCellar && styles.secondaryBtnActive]}>
           <Ionicons name={inCellar ? 'checkmark-circle' : 'wine-outline'} size={18} color={inCellar ? COLORS.gold : COLORS.burgundy} />
           <Text style={[styles.secondaryText, inCellar && { color: COLORS.gold }]}>
             {inCellar ? t.cellar.inCellar : t.cellar.addToCellar}
           </Text>
         </Pressable>
+      </View>
+
+      {/* My Notes */}
+      <View style={styles.notesSection}>
+        <Text style={styles.sectionTitle}>{t.wineNotes?.myNotes || 'Mes notes'}</Text>
+
+        {/* Star rating */}
+        <View style={styles.starsRow}>
+          <Text style={styles.starsLabel}>{t.wineNotes?.myRating || 'Ma note'}</Text>
+          <View style={styles.stars}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Pressable key={star} onPress={() => handleRating(star)} hitSlop={6}>
+                <Ionicons
+                  name={star <= noteRating ? 'star' : 'star-outline'}
+                  size={24}
+                  color={star <= noteRating ? COLORS.gold : COLORS.grayLight}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {editingNote ? (
+          <TextInput
+            style={styles.noteInput}
+            value={noteText}
+            onChangeText={setNoteText}
+            placeholder={t.wineNotes?.placeholder || 'Vos impressions sur ce vin...'}
+            placeholderTextColor={COLORS.gray}
+            multiline
+            autoFocus
+            onBlur={handleSaveNote}
+          />
+        ) : existingNote?.note ? (
+          <Pressable onPress={() => setEditingNote(true)} style={styles.noteDisplay}>
+            <Text style={styles.noteDisplayText}>{existingNote.note}</Text>
+            <Ionicons name="pencil-outline" size={16} color={COLORS.gray} />
+          </Pressable>
+        ) : (
+          <Pressable onPress={() => setEditingNote(true)} style={styles.addNoteBtn}>
+            <Ionicons name="create-outline" size={18} color={COLORS.burgundy} />
+            <Text style={styles.addNoteText}>{t.wineNotes?.addNote || 'Ajouter une note'}</Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={{ height: SPACING.xl }} />
@@ -213,4 +296,45 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.gold + '10',
   },
   secondaryText: { fontSize: 13, fontWeight: '600', color: COLORS.burgundy },
+  notesSection: {
+    marginTop: SPACING.lg,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    ...SHADOWS.card,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+  },
+  starsLabel: { fontSize: 14, color: COLORS.gray },
+  stars: { flexDirection: 'row', gap: 4 },
+  noteInput: {
+    borderWidth: 1,
+    borderColor: COLORS.grayLight,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.sm,
+    fontSize: 14,
+    color: COLORS.black,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  noteDisplay: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+    padding: SPACING.sm,
+    backgroundColor: COLORS.cream,
+    borderRadius: RADIUS.sm,
+  },
+  noteDisplayText: { flex: 1, fontSize: 14, color: COLORS.grayDark, lineHeight: 20 },
+  addNoteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+  },
+  addNoteText: { fontSize: 14, color: COLORS.burgundy, fontWeight: '600' },
 });

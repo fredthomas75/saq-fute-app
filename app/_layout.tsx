@@ -9,6 +9,8 @@ import { SettingsProvider } from '@/context/SettingsContext';
 import { SearchHistoryProvider } from '@/context/SearchHistoryContext';
 import { CellarProvider } from '@/context/CellarContext';
 import { TasteProfileProvider } from '@/context/TasteProfileContext';
+import { WishlistProvider } from '@/context/WishlistContext';
+import { WineNotesProvider } from '@/context/WineNotesContext';
 import { COLORS } from '@/constants/theme';
 import 'react-native-reanimated';
 
@@ -41,6 +43,8 @@ export default function RootLayout() {
       <FavoritesProvider>
         <SearchHistoryProvider>
           <CellarProvider>
+            <WishlistProvider>
+            <WineNotesProvider>
             <TasteProfileProvider>
               <StatusBar style="light" />
               <Stack
@@ -60,8 +64,11 @@ export default function RootLayout() {
                 <Stack.Screen name="menu-scan" options={{ title: 'Menu' }} />
                 <Stack.Screen name="map" options={{ title: 'Carte des vins' }} />
                 <Stack.Screen name="country-wines" options={{ title: 'Vins' }} />
+                <Stack.Screen name="wishlist" options={{ title: 'À essayer' }} />
               </Stack>
             </TasteProfileProvider>
+            </WineNotesProvider>
+            </WishlistProvider>
           </CellarProvider>
         </SearchHistoryProvider>
       </FavoritesProvider>

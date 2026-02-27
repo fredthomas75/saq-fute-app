@@ -54,6 +54,9 @@ export default function CameraScreen() {
           <Pressable onPress={requestPermission} style={styles.grantBtn}>
             <Text style={styles.grantBtnText}>{t.camera.grant}</Text>
           </Pressable>
+          <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
+            <Text style={styles.cancelBtnText}>{t.camera.cancel || 'Annuler'}</Text>
+          </Pressable>
         </View>
       );
     }
@@ -195,6 +198,8 @@ const styles = StyleSheet.create({
   backBtnText: { color: COLORS.white, fontWeight: '700' },
   grantBtn: { paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md, backgroundColor: COLORS.burgundy, borderRadius: RADIUS.md },
   grantBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
+  cancelBtn: { paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm },
+  cancelBtnText: { color: COLORS.gray, fontSize: 15, fontWeight: '600', textDecorationLine: 'underline' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',

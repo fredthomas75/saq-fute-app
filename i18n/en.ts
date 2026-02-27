@@ -199,6 +199,7 @@ export const en: typeof fr = {
     permissionTitle: 'Camera access required',
     permissionMsg: 'To scan barcodes and labels',
     grant: 'Grant',
+    cancel: 'Cancel',
   },
 
   menuScan: {
@@ -246,5 +247,20 @@ export const en: typeof fr = {
     error: 'Error',
     retry: 'Retry',
     sale: 'SALE',
+  },
+
+  wishlist: {
+    title: 'Wishlist',
+    empty: 'Your wishlist is empty',
+    emptySub: 'Add wines you\'d like to try',
+    add: 'Want to try',
+    inList: 'In my list',
+  },
+
+  wineNotes: {
+    myNotes: 'My notes',
+    addNote: 'Add a note',
+    placeholder: 'Your impressions of this wine...',
+    myRating: 'My rating',
   },
 };

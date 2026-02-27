@@ -197,6 +197,7 @@ export const fr = {
     permissionTitle: 'Accès caméra requis',
     permissionMsg: 'Pour scanner les codes-barres et étiquettes',
     grant: 'Autoriser',
+    cancel: 'Annuler',
   },
 
   menuScan: {
@@ -244,5 +245,20 @@ export const fr = {
     error: 'Erreur',
     retry: 'Réessayer',
     sale: 'PROMO',
+  },
+
+  wishlist: {
+    title: 'À essayer',
+    empty: 'Votre liste est vide',
+    emptySub: 'Ajoutez des vins que vous aimeriez goûter',
+    add: 'À essayer',
+    inList: 'Dans ma liste',
+  },
+
+  wineNotes: {
+    myNotes: 'Mes notes',
+    addNote: 'Ajouter une note',
+    placeholder: 'Vos impressions sur ce vin...',
+    myRating: 'Ma note',
   },
 };
