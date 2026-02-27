@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, FlatList, Pressable, TextInput, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { useCellar, CellarWine } from '@/context/CellarContext';
 import { useTranslation } from '@/i18n';
 import EmptyState from '@/components/EmptyState';
+import WineListSort, { SortKey } from '@/components/WineListSort';
 
 const TYPE_COLORS: Record<string, string> = {
   Rouge: '#722F37',
@@ -65,9 +66,28 @@ function CellarItem({ wine }: { wine: CellarWine }) {
   );
 }
 
+function sortCellar(wines: CellarWine[], sortBy: SortKey): CellarWine[] {
+  if (sortBy === 'default') return wines;
+  return [...wines].sort((a, b) => {
+    switch (sortBy) {
+      case 'price_asc': return a.price - b.price;
+      case 'price_desc': return b.price - a.price;
+      case 'name': return a.name.localeCompare(b.name);
+      default: return 0;
+    }
+  });
+}
+
 export default function CellarScreen() {
   const t = useTranslation();
   const { cellar, totalBottles, totalValue, clearCellar } = useCellar();
+  const [sortBy, setSortBy] = useState<SortKey>('default');
+  const [filterType, setFilterType] = useState<string | undefined>();
+
+  const displayedWines = useMemo(() => {
+    let list = filterType ? cellar.filter((w) => w.type === filterType) : cellar;
+    return sortCellar(list, sortBy);
+  }, [cellar, sortBy, filterType]);
 
   const handleClear = () => {
     Alert.alert(t.cellar.clearCellarConfirm, t.cellar.clearCellarConfirmMsg, [
@@ -98,8 +118,16 @@ export default function CellarScreen() {
         </View>
       </View>
 
+      <WineListSort
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        filterType={filterType}
+        onFilterChange={setFilterType}
+        resultCount={displayedWines.length}
+      />
+
       <FlatList
-        data={cellar}
+        data={displayedWines}
         keyExtractor={(item) => item.wineId}
         renderItem={({ item }) => <CellarItem wine={item} />}
         contentContainerStyle={styles.list}

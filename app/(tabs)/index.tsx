@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
@@ -21,6 +21,7 @@ export default function SearchScreen() {
   const router = useRouter();
   const { history, addEntry, removeEntry, clearHistory } = useSearchHistory();
   const { profile } = useTasteProfile();
+  const params = useLocalSearchParams<{ query?: string }>();
   const [query, setQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string | undefined>();
   const [onlySale, setOnlySale] = useState(false);
@@ -57,6 +58,15 @@ export default function SearchScreen() {
       setLoading(false);
     }
   }, [t, addEntry]);
+
+  // Handle incoming query param from map country click
+  useEffect(() => {
+    if (params.query) {
+      setQuery(params.query);
+      stateRef.current.query = params.query;
+      doSearch();
+    }
+  }, [params.query, doSearch]);
 
   const handleQueryChange = useCallback((text: string) => {
     setQuery(text);

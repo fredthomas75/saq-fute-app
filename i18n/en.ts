@@ -216,6 +216,20 @@ export const en: typeof fr = {
     wines: 'wines',
     seeWines: 'See wines',
     loading: 'Loading...',
+    allRegions: 'All regions',
+    regions: 'regions',
+    unknown: 'Other',
+    winesFrom: 'Wines from',
+  },
+
+  sort: {
+    sortBy: 'Sort',
+    priceAsc: 'Price ↑',
+    priceDesc: 'Price ↓',
+    name: 'Name',
+    bestDeal: 'Deal',
+    rating: 'Rating',
+    all: 'All',
   },
 
   common: {

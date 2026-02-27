@@ -59,6 +59,7 @@ export default function RootLayout() {
                 <Stack.Screen name="camera" options={{ title: 'Scanner', headerShown: false }} />
                 <Stack.Screen name="menu-scan" options={{ title: 'Menu' }} />
                 <Stack.Screen name="map" options={{ title: 'Carte des vins' }} />
+                <Stack.Screen name="country-wines" options={{ title: 'Vins' }} />
               </Stack>
             </TasteProfileProvider>
           </CellarProvider>
