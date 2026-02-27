@@ -72,10 +72,14 @@ export default function WineDetailScreen() {
   };
 
   const handleShare = async () => {
-    const dealInfo = wine.onSale && wine.dealLabel ? ` (${wine.dealLabel})` : '';
-    await Share.share({
-      message: `🍷 ${wine.name}\n💰 ${wine.price?.toFixed(2)}$${dealInfo}\n🔗 ${wine.saqUrl}`,
-    });
+    try {
+      const dealInfo = wine.onSale && wine.dealLabel ? ` (${wine.dealLabel})` : '';
+      await Share.share({
+        message: `🍷 ${wine.name}\n💰 ${wine.price?.toFixed(2)}$${dealInfo}\n🔗 ${wine.saqUrl}`,
+      });
+    } catch (_) {
+      // User cancelled or share failed — ignore
+    }
   };
 
   return (
@@ -188,6 +192,15 @@ export default function WineDetailScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {/* Compare button */}
+      <Pressable
+        onPress={() => router.push({ pathname: '/compare', params: { wine: wine.name } })}
+        style={styles.compareBtn}
+      >
+        <Ionicons name="git-compare-outline" size={18} color={COLORS.burgundy} />
+        <Text style={styles.compareText}>{t.compare?.compareWith || 'Comparer avec un autre vin'}</Text>
+      </Pressable>
 
       {/* My Notes */}
       <View style={styles.notesSection}>
@@ -337,4 +350,22 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   addNoteText: { fontSize: 14, color: COLORS.burgundy, fontWeight: '600' },
+  compareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    marginTop: SPACING.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.grayLight,
+    borderStyle: 'dashed',
+    backgroundColor: COLORS.white,
+  },
+  compareText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.burgundy,
+  },
 });

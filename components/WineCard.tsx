@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useWishlist } from '@/context/WishlistContext';
+import { useWineNotes } from '@/context/WineNotesContext';
 import type { Wine } from '@/types/wine';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -30,8 +31,10 @@ export default function WineCard({ wine, compact }: Props) {
   const router = useRouter();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
+  const { getNote } = useWineNotes();
   const fav = isFavorite(wine.id);
   const wished = isInWishlist(wine.id);
+  const userNote = getNote(wine.id);
 
   const handlePress = () => {
     router.push({ pathname: '/wine/[id]', params: { id: wine.id, name: wine.name } });
@@ -55,8 +58,17 @@ export default function WineCard({ wine, compact }: Props) {
       <Pressable onPress={handlePress} style={styles.compactCard}>
         <Text style={styles.compactName} numberOfLines={2}>{wine.name}</Text>
         <Text style={styles.compactPrice}>{wine.price?.toFixed(2)}$</Text>
-        <View style={[styles.typePill, { backgroundColor: typeColor }]}>
-          <Text style={styles.typePillText}>{wine.type}</Text>
+        <View style={styles.compactBottom}>
+          <View style={[styles.typePill, { backgroundColor: typeColor }]}>
+            <Text style={styles.typePillText}>{wine.type}</Text>
+          </View>
+          {userNote?.rating && userNote.rating > 0 && (
+            <View style={styles.compactStars}>
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Ionicons key={s} name={s <= userNote.rating! ? 'star' : 'star-outline'} size={10} color={s <= userNote.rating! ? COLORS.gold : COLORS.grayLight} />
+              ))}
+            </View>
+          )}
         </View>
       </Pressable>
     );
@@ -92,6 +104,20 @@ export default function WineCard({ wine, compact }: Props) {
 
       {wine.grapes && wine.grapes.length > 0 && (
         <Text style={styles.grapes} numberOfLines={1}>🍇 {wine.grapes.join(', ')}</Text>
+      )}
+
+      {userNote?.rating && userNote.rating > 0 && (
+        <View style={styles.userRatingRow}>
+          {[1, 2, 3, 4, 5].map((s) => (
+            <Ionicons
+              key={s}
+              name={s <= userNote.rating! ? 'star' : 'star-outline'}
+              size={14}
+              color={s <= userNote.rating! ? COLORS.gold : COLORS.grayLight}
+            />
+          ))}
+          {userNote.note ? <Ionicons name="chatbubble" size={12} color={COLORS.gray} style={{ marginLeft: 4 }} /> : null}
+        </View>
       )}
 
       <View style={styles.footer}>
@@ -207,6 +233,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  userRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
   // Compact variant
   compactCard: {
     backgroundColor: COLORS.white,
@@ -228,5 +259,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.burgundy,
     marginBottom: SPACING.xs,
+  },
+  compactBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  compactStars: {
+    flexDirection: 'row',
+    gap: 1,
   },
 });

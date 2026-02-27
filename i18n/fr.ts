@@ -104,6 +104,8 @@ export const fr = {
     wine2Placeholder: 'Deuxième vin (nom ou code SAQ)',
     compareButton: 'Comparer',
     score: 'Score',
+    winner: 'Meilleur choix',
+    compareWith: 'Comparer avec un autre vin',
   },
 
   settings: {
