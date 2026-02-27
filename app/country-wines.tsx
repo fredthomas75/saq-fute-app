@@ -29,10 +29,10 @@ const COUNTRY_FLAGS: Record<string, string> = {
 
 export default function CountryWinesScreen() {
   const t = useTranslation();
-  const { country } = useLocalSearchParams<{ country: string }>();
+  const { country, region: initialRegion } = useLocalSearchParams<{ country: string; region?: string }>();
   const [wines, setWines] = useState<Wine[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(initialRegion || null);
   const [sortBy, setSortBy] = useState<SortKey>('default');
   const [filterType, setFilterType] = useState<string | undefined>();
 
