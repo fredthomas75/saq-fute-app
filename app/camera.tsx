@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -22,6 +22,7 @@ export default function CameraScreen() {
   const [mode, setMode] = useState<'barcode' | 'label'>('barcode');
   const [scanned, setScanned] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
 
   // Graceful fallback if expo-camera not installed
   if (!CameraView || !useCameraPermissions) {
@@ -65,10 +66,10 @@ export default function CameraScreen() {
         if (result.wines.length > 0) {
           router.replace({ pathname: '/wine/[id]', params: { id: result.wines[0].id } });
         } else {
-          setScanned(false);
+          setNotFoundQuery(data);
         }
       } catch {
-        setScanned(false);
+        setNotFoundQuery(data);
       }
     };
 
@@ -81,9 +82,26 @@ export default function CameraScreen() {
         const result = await saqApi.search({ query: wineName.trim(), limit: 5 });
         if (result.wines.length > 0) {
           router.replace({ pathname: '/wine/[id]', params: { id: result.wines[0].id } });
+        } else {
+          setNotFoundQuery(wineName.trim());
         }
-      } catch {}
+      } catch (e) {
+        setNotFoundQuery('');
+      }
       setAnalyzing(false);
+    };
+
+    const handleOpenSAQ = () => {
+      const query = encodeURIComponent(notFoundQuery || '');
+      const url = query
+        ? `https://www.saq.com/fr/catalogsearch/result/?q=${query}`
+        : 'https://www.saq.com';
+      Linking.openURL(url);
+    };
+
+    const handleRetry = () => {
+      setNotFoundQuery(null);
+      setScanned(false);
     };
 
     return (
@@ -117,6 +135,22 @@ export default function CameraScreen() {
             </View>
           )}
         </View>
+
+        {/* Not found overlay */}
+        {notFoundQuery !== null && (
+          <View style={styles.notFoundOverlay}>
+            <Ionicons name="search-outline" size={40} color={COLORS.white} />
+            <Text style={styles.notFoundTitle}>{t.camera.notFound}</Text>
+            <Text style={styles.notFoundSub}>{t.camera.notFoundSub}</Text>
+            <Pressable onPress={handleOpenSAQ} style={styles.saqBtn}>
+              <Ionicons name="open-outline" size={18} color={COLORS.white} />
+              <Text style={styles.saqBtnText}>{t.camera.searchSAQ || 'Chercher sur SAQ.com'}</Text>
+            </Pressable>
+            <Pressable onPress={handleRetry} style={styles.retryBtn}>
+              <Text style={styles.retryBtnText}>{t.camera.retry || 'Réessayer'}</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Bottom controls */}
         <View style={styles.bottom}>
@@ -212,4 +246,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   captureInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.white },
+  notFoundOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    zIndex: 10,
+  },
+  notFoundTitle: { fontSize: 20, fontWeight: '700', color: COLORS.white },
+  notFoundSub: { fontSize: 14, color: '#ffffff99', textAlign: 'center' },
+  saqBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.burgundy,
+    borderRadius: RADIUS.md,
+  },
+  saqBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
+  retryBtn: {
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.sm,
+  },
+  retryBtnText: { color: '#ffffffCC', fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
 });
