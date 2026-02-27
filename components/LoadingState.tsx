@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SPACING } from '@/constants/theme';
+import WineGlassLoader from './WineGlassLoader';
 
 interface Props {
   message?: string;
@@ -9,7 +10,7 @@ interface Props {
 export default function LoadingState({ message = 'Chargement...' }: Props) {
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color={COLORS.burgundy} />
+      <WineGlassLoader size={80} />
       <Text style={styles.text}>{message}</Text>
     </View>
   );

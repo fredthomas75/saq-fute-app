@@ -21,7 +21,8 @@ interface FavState {
 type FavAction =
   | { type: 'LOAD'; favorites: FavWine[] }
   | { type: 'ADD'; wine: FavWine }
-  | { type: 'REMOVE'; id: string };
+  | { type: 'REMOVE'; id: string }
+  | { type: 'CLEAR' };
 
 function reducer(state: FavState, action: FavAction): FavState {
   switch (action.type) {
@@ -32,6 +33,8 @@ function reducer(state: FavState, action: FavAction): FavState {
       return { ...state, favorites: [action.wine, ...state.favorites] };
     case 'REMOVE':
       return { ...state, favorites: state.favorites.filter((w) => w.id !== action.id) };
+    case 'CLEAR':
+      return { ...state, favorites: [] };
     default:
       return state;
   }
@@ -42,6 +45,7 @@ interface FavContextValue {
   addFavorite: (wine: Wine) => void;
   removeFavorite: (id: string) => void;
   isFavorite: (id: string) => boolean;
+  clearAll: () => void;
 }
 
 const FavoritesContext = createContext<FavContextValue>({
@@ -49,6 +53,7 @@ const FavoritesContext = createContext<FavContextValue>({
   addFavorite: () => {},
   removeFavorite: () => {},
   isFavorite: () => false,
+  clearAll: () => {},
 });
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
@@ -96,8 +101,12 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     [state.favorites]
   );
 
+  const clearAll = useCallback(() => {
+    dispatch({ type: 'CLEAR' });
+  }, []);
+
   return (
-    <FavoritesContext.Provider value={{ favorites: state.favorites, addFavorite, removeFavorite, isFavorite }}>
+    <FavoritesContext.Provider value={{ favorites: state.favorites, addFavorite, removeFavorite, isFavorite, clearAll }}>
       {children}
     </FavoritesContext.Provider>
   );
