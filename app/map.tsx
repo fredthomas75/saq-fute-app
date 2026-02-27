@@ -39,7 +39,7 @@ export default function MapScreen() {
   const maxCount = countries[0]?.count || 1;
 
   const handleCountryPress = (country: string) => {
-    router.push({ pathname: '/(tabs)', params: { searchCountry: country } });
+    router.push({ pathname: '/country-wines', params: { country } });
   };
 
   return (

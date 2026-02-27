@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '@/constants/theme';
 import { useTranslation } from '@/i18n';
 import Logo from '@/components/Logo';
@@ -20,10 +20,10 @@ function HeaderRight() {
   return (
     <View style={styles.headerRightRow}>
       <Pressable onPress={() => router.push('/cellar')} style={styles.headerBtn} hitSlop={12}>
-        <Ionicons name="wine-outline" size={21} color={COLORS.white} />
+        <MaterialCommunityIcons name="bottle-wine-outline" size={22} color={COLORS.white} />
       </Pressable>
       <Pressable onPress={() => router.push('/map')} style={styles.headerBtn} hitSlop={12}>
-        <Ionicons name="globe-outline" size={21} color={COLORS.white} />
+        <Ionicons name="map-outline" size={21} color={COLORS.white} />
       </Pressable>
       <Pressable onPress={() => router.push('/settings')} style={styles.headerBtn} hitSlop={12}>
         <Ionicons name="settings-outline" size={22} color={COLORS.white} />

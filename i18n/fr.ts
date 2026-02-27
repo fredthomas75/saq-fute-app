@@ -214,6 +214,20 @@ export const fr = {
     wines: 'vins',
     seeWines: 'Voir les vins',
     loading: 'Chargement...',
+    allRegions: 'Toutes les régions',
+    regions: 'régions',
+    unknown: 'Autre',
+    winesFrom: 'Vins de',
+  },
+
+  sort: {
+    sortBy: 'Trier',
+    priceAsc: 'Prix ↑',
+    priceDesc: 'Prix ↓',
+    name: 'Nom',
+    bestDeal: 'Deal',
+    rating: 'Note',
+    all: 'Tous',
   },
 
   common: {

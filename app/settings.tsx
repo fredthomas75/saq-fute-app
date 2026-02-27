@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable, Switch, Alert, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { useSettings } from '@/context/SettingsContext';
 import { useFavorites } from '@/context/FavoritesContext';
@@ -64,7 +64,7 @@ export default function SettingsScreen() {
       <Text style={styles.sectionHeader}>{t.settings.data}</Text>
       <View style={styles.quickActions}>
         <Pressable onPress={() => router.push('/cellar')} style={styles.quickBtn}>
-          <Ionicons name="wine-outline" size={24} color={COLORS.burgundy} />
+          <MaterialCommunityIcons name="bottle-wine-outline" size={24} color={COLORS.burgundy} />
           <Text style={styles.quickLabel}>{t.cellar.title}</Text>
           {totalBottles > 0 && <Text style={styles.quickBadge}>{totalBottles}</Text>}
         </Pressable>
@@ -74,7 +74,7 @@ export default function SettingsScreen() {
           {profile?.completed && <Ionicons name="checkmark-circle" size={16} color={COLORS.gold} />}
         </Pressable>
         <Pressable onPress={() => router.push('/map')} style={styles.quickBtn}>
-          <Ionicons name="globe-outline" size={24} color={COLORS.burgundy} />
+          <Ionicons name="map-outline" size={24} color={COLORS.burgundy} />
           <Text style={styles.quickLabel}>{t.map.title}</Text>
         </Pressable>
       </View>
