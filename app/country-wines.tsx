@@ -38,8 +38,22 @@ export default function CountryWinesScreen() {
 
   useEffect(() => {
     if (country) {
-      saqApi.search({ query: country, limit: 100 })
-        .then((data) => setWines(data.wines))
+      Promise.all([
+        saqApi.search({ query: country, limit: 100 }),
+        saqApi.search({ query: country, limit: 50, vip: true }),
+      ])
+        .then(([regular, vip]) => {
+          const seen = new Set<string>();
+          const merged: Wine[] = [];
+          // VIP wines first (they have expert scores), then regular
+          for (const w of [...vip.wines, ...regular.wines]) {
+            if (!seen.has(w.id)) {
+              seen.add(w.id);
+              merged.push(w);
+            }
+          }
+          setWines(merged);
+        })
         .catch(() => {})
         .finally(() => setLoading(false));
     }

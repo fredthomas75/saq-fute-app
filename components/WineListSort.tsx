@@ -36,7 +36,14 @@ export function sortWines<T extends { price: number; name: string; dealScore?: n
       case 'price_desc': return b.price - a.price;
       case 'name': return a.name.localeCompare(b.name);
       case 'deal': return (b.dealScore || 0) - (a.dealScore || 0);
-      case 'rating': return (b.maxExpertScore || 0) - (a.maxExpertScore || 0);
+      case 'rating': {
+        const aScore = a.maxExpertScore || 0;
+        const bScore = b.maxExpertScore || 0;
+        // Wines with actual expert scores (90+) first, then by score desc
+        if (aScore >= 90 && bScore < 90) return -1;
+        if (bScore >= 90 && aScore < 90) return 1;
+        return bScore - aScore;
+      }
       default: return 0;
     }
   });
