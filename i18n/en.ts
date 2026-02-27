@@ -106,6 +106,8 @@ export const en: typeof fr = {
     wine2Placeholder: 'Second wine (name or SAQ code)',
     compareButton: 'Compare',
     score: 'Score',
+    winner: 'Best pick',
+    compareWith: 'Compare with another wine',
   },
 
   settings: {
