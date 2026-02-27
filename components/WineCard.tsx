@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
+import { useWishlist } from '@/context/WishlistContext';
 import type { Wine } from '@/types/wine';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -28,7 +29,9 @@ interface Props {
 export default function WineCard({ wine, compact }: Props) {
   const router = useRouter();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const fav = isFavorite(wine.id);
+  const wished = isInWishlist(wine.id);
 
   const handlePress = () => {
     router.push({ pathname: '/wine/[id]', params: { id: wine.id, name: wine.name } });
@@ -37,6 +40,11 @@ export default function WineCard({ wine, compact }: Props) {
   const toggleFav = () => {
     if (fav) removeFavorite(wine.id);
     else addFavorite(wine);
+  };
+
+  const toggleWish = () => {
+    if (wished) removeFromWishlist(wine.id);
+    else addToWishlist(wine);
   };
 
   const flag = COUNTRY_FLAGS[wine.country] || '🍷';
@@ -65,9 +73,14 @@ export default function WineCard({ wine, compact }: Props) {
           {wine.isOrganic && <Text style={styles.organicBadge}>🌿</Text>}
           {wine.onSale && <Text style={styles.saleBadge}>PROMO</Text>}
         </View>
-        <Pressable onPress={toggleFav} hitSlop={12}>
-          <Ionicons name={fav ? 'heart' : 'heart-outline'} size={24} color={fav ? COLORS.red : COLORS.gray} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={toggleWish} hitSlop={8}>
+            <Ionicons name={wished ? 'bookmark' : 'bookmark-outline'} size={20} color={wished ? COLORS.gold : COLORS.gray} />
+          </Pressable>
+          <Pressable onPress={toggleFav} hitSlop={8}>
+            <Ionicons name={fav ? 'heart' : 'heart-outline'} size={24} color={fav ? COLORS.red : COLORS.gray} />
+          </Pressable>
+        </View>
       </View>
 
       <Text style={styles.name} numberOfLines={2}>{wine.name}</Text>
@@ -117,6 +130,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   typePill: {
     paddingHorizontal: SPACING.sm,

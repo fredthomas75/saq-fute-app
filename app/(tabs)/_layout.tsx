@@ -7,11 +7,12 @@ import { useTranslation } from '@/i18n';
 import Logo from '@/components/Logo';
 
 function HeaderLogo() {
+  const router = useRouter();
   return (
-    <View style={styles.headerLogoRow}>
+    <Pressable onPress={() => router.replace('/')} style={styles.headerLogoRow}>
       <Logo size={28} color={COLORS.cream} accentColor={COLORS.gold} />
       <Text style={styles.headerLogoText}>SAQ Futé</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -21,6 +22,9 @@ function HeaderRight() {
     <View style={styles.headerRightRow}>
       <Pressable onPress={() => router.push('/cellar')} style={styles.headerBtn} hitSlop={12}>
         <MaterialCommunityIcons name="bottle-wine-outline" size={22} color={COLORS.white} />
+      </Pressable>
+      <Pressable onPress={() => router.push('/wishlist')} style={styles.headerBtn} hitSlop={12}>
+        <Ionicons name="bookmark-outline" size={21} color={COLORS.white} />
       </Pressable>
       <Pressable onPress={() => router.push('/map')} style={styles.headerBtn} hitSlop={12}>
         <Ionicons name="map-outline" size={21} color={COLORS.white} />
