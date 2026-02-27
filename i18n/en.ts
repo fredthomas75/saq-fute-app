@@ -100,16 +100,6 @@ export const en: typeof fr = {
     buyOnSAQ: 'Buy on SAQ',
   },
 
-  compare: {
-    title: '⚖️ Compare two wines',
-    wine1Placeholder: 'First wine (name or SAQ code)',
-    wine2Placeholder: 'Second wine (name or SAQ code)',
-    compareButton: 'Compare',
-    score: 'Score',
-    winner: 'Best pick',
-    compareWith: 'Compare with another wine',
-  },
-
   settings: {
     title: 'Settings',
     language: 'Language',

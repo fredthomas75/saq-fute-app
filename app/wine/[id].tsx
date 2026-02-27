@@ -193,15 +193,6 @@ export default function WineDetailScreen() {
         </Pressable>
       </View>
 
-      {/* Compare button */}
-      <Pressable
-        onPress={() => router.push({ pathname: '/compare', params: { wine: wine.name } })}
-        style={styles.compareBtn}
-      >
-        <Ionicons name="git-compare-outline" size={18} color={COLORS.burgundy} />
-        <Text style={styles.compareText}>{t.compare?.compareWith || 'Comparer avec un autre vin'}</Text>
-      </Pressable>
-
       {/* My Notes */}
       <View style={styles.notesSection}>
         <Text style={styles.sectionTitle}>{t.wineNotes?.myNotes || 'Mes notes'}</Text>
@@ -350,22 +341,4 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   addNoteText: { fontSize: 14, color: COLORS.burgundy, fontWeight: '600' },
-  compareBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.sm,
-    marginTop: SPACING.sm,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.grayLight,
-    borderStyle: 'dashed',
-    backgroundColor: COLORS.white,
-  },
-  compareText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.burgundy,
-  },
 });

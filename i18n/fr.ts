@@ -98,16 +98,6 @@ export const fr = {
     buyOnSAQ: 'Acheter sur SAQ',
   },
 
-  compare: {
-    title: '⚖️ Comparer deux vins',
-    wine1Placeholder: 'Premier vin (nom ou code SAQ)',
-    wine2Placeholder: 'Deuxième vin (nom ou code SAQ)',
-    compareButton: 'Comparer',
-    score: 'Score',
-    winner: 'Meilleur choix',
-    compareWith: 'Comparer avec un autre vin',
-  },
-
   settings: {
     title: 'Réglages',
     language: 'Langue',
