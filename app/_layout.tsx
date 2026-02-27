@@ -56,7 +56,6 @@ export default function RootLayout() {
               >
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="wine/[id]" options={{ title: 'Détails du vin' }} />
-                <Stack.Screen name="compare" options={{ title: 'Comparer', presentation: 'modal' }} />
                 <Stack.Screen name="settings" options={{ title: 'Réglages' }} />
                 <Stack.Screen name="cellar" options={{ title: 'Ma cave' }} />
                 <Stack.Screen name="quiz" options={{ title: 'Quiz', presentation: 'modal' }} />
