@@ -79,7 +79,9 @@ export default function WineDetailScreen() {
 
   const handleShare = async () => {
     try {
-      const dealInfo = wine.onSale && wine.dealLabel ? ` (${wine.dealLabel})` : '';
+      const dealInfo = wine.dealScore >= 80
+        ? ` (${wine.dealScore >= 95 ? '🏆 TROUVAILLE' : wine.dealScore >= 88 ? '🔥 Aubaine' : '👍 Bon rapport Q/P'})`
+        : '';
       await Share.share({
         message: `🍷 ${wine.name}\n💰 ${wine.price?.toFixed(2)}$${dealInfo}\n🔗 ${wine.saqUrl}`,
       });
@@ -109,9 +111,13 @@ export default function WineDetailScreen() {
         {wine.onSale && wine.originalPrice && (
           <Text style={styles.origPrice}>{wine.originalPrice.toFixed(2)}$</Text>
         )}
-        <View style={styles.dealBadge}>
-          <Text style={styles.dealText}>{wine.dealLabel}</Text>
-        </View>
+        {wine.dealScore >= 80 && (
+          <View style={[styles.dealBadge, { backgroundColor: wine.dealScore >= 95 ? COLORS.gold : wine.dealScore >= 88 ? '#27ae60' : COLORS.burgundy + '18' }]}>
+            <Text style={[styles.dealText, { color: wine.dealScore >= 88 ? COLORS.white : COLORS.burgundy }]}>
+              {wine.dealScore >= 95 ? '🏆 TROUVAILLE!' : wine.dealScore >= 88 ? '🔥 Aubaine' : '👍 Bon rapport Q/P'}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Info grid */}
