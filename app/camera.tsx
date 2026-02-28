@@ -65,12 +65,19 @@ export default function CameraScreen() {
       if (scanned) return;
       setScanned(true);
       try {
+        // Try local DB first
         const result = await saqApi.search({ query: data, limit: 1 });
         if (result.wines.length > 0) {
           router.replace({ pathname: '/wine/[id]', params: { id: result.wines[0].id } });
-        } else {
-          setNotFoundQuery(data);
+          return;
         }
+        // Fallback: live search on saq.com
+        const browseResult = await saqApi.browse(data);
+        if (browseResult.wines && browseResult.wines.length > 0) {
+          router.replace({ pathname: '/wine/[id]', params: { id: browseResult.wines[0].id } });
+          return;
+        }
+        setNotFoundQuery(data);
       } catch {
         setNotFoundQuery(data);
       }

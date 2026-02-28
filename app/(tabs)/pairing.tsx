@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
+import { View, Text, FlatList, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
@@ -11,17 +11,33 @@ import WineCard from '@/components/WineCard';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
 
-const DISH_KEYS = [
-  'steak', 'pizza', 'sushi', 'poulet', 'bbq', 'poisson',
-  'fromage', 'tourtiere', 'poutine', 'pates', 'homard',
-  'charcuterie', 'salade', 'agneau', 'dessert',
+// Categories with their dish keys
+const CATEGORIES = [
+  'populaires', 'quebecois', 'viandes', 'mer', 'monde', 'autres',
 ] as const;
+
+const CATEGORY_DISHES: Record<string, string[]> = {
+  populaires: ['steak', 'pizza', 'poulet', 'pates', 'bbq', 'sushi'],
+  quebecois: ['tourtiere', 'poutine', 'cipaille', 'pate_chinois', 'creton', 'ragout', 'smoked_meat', 'tarte_sucre'],
+  viandes: ['agneau', 'porc', 'canard', 'gibier', 'veau'],
+  mer: ['homard', 'poisson', 'saumon', 'crevettes', 'moules', 'huitres'],
+  monde: ['thai', 'indien', 'mexicain', 'marocain', 'japonais', 'libanais'],
+  autres: ['fromage', 'charcuterie', 'salade', 'fondue', 'risotto', 'dessert'],
+};
+
+const ALL_DISH_KEYS = Object.values(CATEGORY_DISHES).flat();
 
 const DISH_EMOJIS: Record<string, string> = {
   steak: '🥩', pizza: '🍕', sushi: '🍣', poulet: '🍗',
   bbq: '🔥', poisson: '🐟', fromage: '🧀', tourtiere: '🥧',
   poutine: '🍟', pates: '🍝', homard: '🦞', charcuterie: '🥓',
-  salade: '🥗', agneau: '🐑', dessert: '🍰',
+  salade: '🥗', agneau: '🐑', dessert: '🍰', cipaille: '🫕',
+  pate_chinois: '🥘', creton: '🧈', ragout: '🍲', smoked_meat: '🥪',
+  tarte_sucre: '🥧', porc: '🐖', canard: '🦆', gibier: '🦌',
+  veau: '🥩', saumon: '🐟', crevettes: '🦐', moules: '🦪',
+  huitres: '🦪', thai: '🍜', indien: '🍛', mexicain: '🌮',
+  marocain: '🫕', japonais: '🍱', libanais: '🧆', fondue: '🫕',
+  risotto: '🍚',
 };
 
 export default function PairingScreen() {
@@ -34,6 +50,7 @@ export default function PairingScreen() {
   const [activeDish, setActiveDish] = useState<string | null>(null);
 
   const dishLabels = t.pairing.dishes as Record<string, string>;
+  const categoryLabels = t.pairing.categories as Record<string, string>;
 
   const searchPairing = useCallback(async (d: string) => {
     if (!d) return;
@@ -73,7 +90,7 @@ export default function PairingScreen() {
       </View>
 
       {!hasSearched && (
-        <>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Menu scan promo */}
           <Pressable onPress={() => router.push('/menu-scan')} style={styles.menuBanner}>
             <Ionicons name="restaurant-outline" size={20} color={COLORS.burgundy} />
@@ -84,21 +101,30 @@ export default function PairingScreen() {
             <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
           </Pressable>
 
-          <View style={styles.grid}>
-            {DISH_KEYS.map((key) => (
-              <Pressable
-                key={key}
-                onPress={() => handleDishPress(key)}
-                style={[styles.dishBtn, activeDish === key && styles.dishBtnActive]}
-              >
-                <Text style={styles.dishEmoji}>{DISH_EMOJIS[key]}</Text>
-                <Text style={[styles.dishLabel, activeDish === key && styles.dishLabelActive]}>
-                  {dishLabels[key] || key}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </>
+          {CATEGORIES.map((cat) => (
+            <View key={cat} style={styles.categorySection}>
+              <Text style={styles.categoryTitle}>{categoryLabels[cat] || cat}</Text>
+              <View style={styles.grid}>
+                {CATEGORY_DISHES[cat].map((key) => (
+                  <Pressable
+                    key={key}
+                    onPress={() => handleDishPress(key)}
+                    style={[styles.dishBtn, activeDish === key && styles.dishBtnActive]}
+                  >
+                    <Text style={styles.dishEmoji}>{DISH_EMOJIS[key] || '🍽️'}</Text>
+                    <Text
+                      style={[styles.dishLabel, activeDish === key && styles.dishLabelActive]}
+                      numberOfLines={1}
+                    >
+                      {dishLabels[key] || key}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ))}
+          <View style={{ height: SPACING.xl }} />
+        </ScrollView>
       )}
 
       {loading && <LoadingState message={t.pairing.loading} />}
@@ -126,6 +152,7 @@ export default function PairingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.cream },
+  scrollContent: { paddingBottom: SPACING.xl },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -147,7 +174,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.white,
     marginHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
     padding: SPACING.md,
     borderRadius: RADIUS.md,
     borderWidth: 1,
@@ -167,24 +194,35 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     marginTop: 1,
   },
+  categorySection: {
+    marginBottom: SPACING.md,
+  },
+  categoryTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.black,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    gap: SPACING.sm,
+    gap: SPACING.xs,
   },
   dishBtn: {
-    width: '30%',
-    aspectRatio: 1,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    justifyContent: 'center',
+    borderRadius: RADIUS.full,
+    flexDirection: 'row',
     alignItems: 'center',
-    ...SHADOWS.card,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: COLORS.grayLight,
   },
-  dishBtnActive: { backgroundColor: COLORS.burgundy },
-  dishEmoji: { fontSize: 32, marginBottom: SPACING.xs },
+  dishBtnActive: { backgroundColor: COLORS.burgundy, borderColor: COLORS.burgundy },
+  dishEmoji: { fontSize: 18 },
   dishLabel: { fontSize: 13, fontWeight: '600', color: COLORS.grayDark },
   dishLabelActive: { color: COLORS.white },
   backBtn: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
