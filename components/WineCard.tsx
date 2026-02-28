@@ -74,12 +74,26 @@ export default function WineCard({ wine, compact }: Props) {
   if (compact) {
     return (
       <Pressable onPress={handlePress} style={styles.compactCard}>
-        <Text style={styles.compactName} numberOfLines={2}>{wine.name}</Text>
-        <Text style={styles.compactPrice}>{wine.price?.toFixed(2)}$</Text>
-        <View style={styles.compactBottom}>
-          <View style={[styles.typePill, { backgroundColor: typeColor }]}>
-            <Text style={styles.typePillText}>{typeLabel}</Text>
+        {/* Color accent bar */}
+        <View style={[styles.compactAccent, { backgroundColor: typeColor }]} />
+
+        <View style={styles.compactInner}>
+          {/* Top row: type + badges */}
+          <View style={styles.compactTopRow}>
+            <View style={[styles.typePill, { backgroundColor: typeColor }]}>
+              <Text style={styles.typePillText}>{typeLabel}</Text>
+            </View>
+            {wine.onSale && <Text style={styles.compactSaleBadge}>{t.common.sale}</Text>}
+            {wine.coeurBadge && <Text style={{ fontSize: 12 }}>❤️</Text>}
           </View>
+
+          {/* Name */}
+          <Text style={styles.compactName} numberOfLines={2}>{wine.name}</Text>
+
+          {/* Country */}
+          <Text style={styles.compactCountry} numberOfLines={1}>{flag} {wine.country}</Text>
+
+          {/* User rating */}
           {userNote?.rating && userNote.rating > 0 && (
             <View style={styles.compactStars}>
               {[1, 2, 3, 4, 5].map((s) => (
@@ -87,6 +101,14 @@ export default function WineCard({ wine, compact }: Props) {
               ))}
             </View>
           )}
+
+          {/* Price row */}
+          <View style={styles.compactPriceRow}>
+            <Text style={styles.compactPrice}>{wine.price?.toFixed(2)}$</Text>
+            {wine.onSale && wine.originalPrice && (
+              <Text style={styles.compactOriginalPrice}>{wine.originalPrice.toFixed(2)}$</Text>
+            )}
+          </View>
         </View>
       </Pressable>
     );
@@ -260,28 +282,62 @@ const styles = StyleSheet.create({
   compactCard: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
-    padding: SPACING.sm,
-    width: 150,
+    width: 185,
     marginRight: SPACING.sm,
+    overflow: 'hidden',
     ...SHADOWS.card,
+  },
+  compactAccent: {
+    height: 4,
+    width: '100%',
+  },
+  compactInner: {
+    padding: SPACING.sm,
+    paddingTop: SPACING.xs + 2,
+    gap: 4,
+  },
+  compactTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  compactSaleBadge: {
+    backgroundColor: COLORS.red,
+    color: COLORS.white,
+    fontSize: 9,
+    fontWeight: '700',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
   },
   compactName: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.black,
-    marginBottom: SPACING.xs,
-    height: 36,
+    lineHeight: 17,
+    minHeight: 34,
   },
-  compactPrice: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.burgundy,
-    marginBottom: SPACING.xs,
+  compactCountry: {
+    fontSize: 11,
+    color: COLORS.gray,
   },
-  compactBottom: {
+  compactPriceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
+    marginTop: 2,
+  },
+  compactPrice: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.burgundy,
+  },
+  compactOriginalPrice: {
+    fontSize: 12,
+    color: COLORS.gray,
+    textDecorationLine: 'line-through',
   },
   compactStars: {
     flexDirection: 'row',

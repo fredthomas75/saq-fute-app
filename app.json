@@ -31,7 +31,10 @@
         "backgroundColor": "#722F37"
       },
       "permissions": [
-        "CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -59,6 +62,19 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f5bd587f-6a1a-49f1-8db2-98419fd8ec6e"
+      }
+    },
+    "owner": "fredthomas75",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f5bd587f-6a1a-49f1-8db2-98419fd8ec6e"
     }
   }
 }
