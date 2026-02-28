@@ -56,35 +56,35 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t.tabs.search,
+          tabBarLabel: t.tabs.search,
           tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="deals"
         options={{
-          title: t.tabs.deals,
+          tabBarLabel: t.tabs.deals,
           tabBarIcon: ({ color, size }) => <Ionicons name="flame" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="pairing"
         options={{
-          title: t.tabs.pairing,
+          tabBarLabel: t.tabs.pairing,
           tabBarIcon: ({ color, size }) => <Ionicons name="restaurant" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="chat"
         options={{
-          title: t.tabs.chat,
+          tabBarLabel: t.tabs.chat,
           tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="favorites"
         options={{
-          title: t.tabs.favorites,
+          tabBarLabel: t.tabs.favorites,
           tabBarIcon: ({ color, size }) => <Ionicons name="heart" size={size} color={color} />,
         }}
       />
