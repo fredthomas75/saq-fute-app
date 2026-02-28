@@ -42,7 +42,13 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "SAQ Futé",
+      "shortName": "SAQ Futé",
+      "description": "Trouvez les meilleurs vins au meilleur prix à la SAQ.",
+      "lang": "fr",
+      "themeColor": "#722F37",
+      "backgroundColor": "#FFF8F0"
     },
     "plugins": [
       "expo-router",
