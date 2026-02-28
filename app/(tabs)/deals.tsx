@@ -33,7 +33,6 @@ export default function DealsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const budgetLoaded = useRef(false);
   const hasData = useRef(false);
 
   const shuffle = <T,>(arr: T[]): T[] => {
@@ -45,24 +44,15 @@ export default function DealsScreen() {
     return a;
   };
 
-  // Load persisted budget on mount
-  useEffect(() => {
-    AsyncStorage.getItem(BUDGET_KEY).then((val) => {
-      if (val) setBudget(Number(val));
-      budgetLoaded.current = true;
-    }).catch(() => {
-      budgetLoaded.current = true;
-    });
-  }, []);
-
   // Persist budget when changed
   const handleBudgetChange = useCallback((b: number) => {
     setBudget(b);
+    hasData.current = false;
     AsyncStorage.setItem(BUDGET_KEY, String(b)).catch(() => {});
   }, []);
 
-  const fetchAll = useCallback(async (isRefresh = false) => {
-    if (!isRefresh && hasData.current) return; // Skip if data already loaded (cache)
+  const doFetch = useCallback(async (b: number, isRefresh = false) => {
+    if (!isRefresh && hasData.current) return;
     if (!isRefresh) setLoading(true);
     setError(null);
     try {
@@ -71,7 +61,7 @@ export default function DealsScreen() {
         const cached = await AsyncStorage.getItem(CACHE_KEY);
         if (cached) {
           const data: CacheData = JSON.parse(cached);
-          if (Date.now() - data.timestamp < CACHE_TTL && data.budget === budget) {
+          if (Date.now() - data.timestamp < CACHE_TTL && data.budget === b) {
             setCoeurs(shuffle(data.coeurs).slice(0, 10));
             setDeals(data.deals);
             setPromos(data.promos);
@@ -84,7 +74,7 @@ export default function DealsScreen() {
 
       const [coeurRes, dealsRes, promoRes] = await Promise.all([
         saqApi.coeur({ limit: 30 }),
-        saqApi.deals({ budget, limit: 10 }),
+        saqApi.deals({ budget: b, limit: 10 }),
         saqApi.search({ onlySale: true, limit: 10 }),
       ]);
 
@@ -98,7 +88,7 @@ export default function DealsScreen() {
         coeurs: coeurRes.wines,
         deals: dealsRes.wines,
         promos: promoRes.wines,
-        budget,
+        budget: b,
         timestamp: Date.now(),
       } as CacheData)).catch(() => {});
     } catch (err) {
@@ -107,24 +97,34 @@ export default function DealsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [budget, t]);
+  }, [t]);
 
-  // Refetch when budget changes (but only after initial load)
+  // Load persisted budget then fetch
   useEffect(() => {
-    if (!budgetLoaded.current) return;
-    hasData.current = false; // Force refetch on budget change
-    fetchAll();
-  }, [fetchAll]);
+    AsyncStorage.getItem(BUDGET_KEY).then((val) => {
+      const b = val ? Number(val) : 25;
+      setBudget(b);
+      doFetch(b);
+    }).catch(() => {
+      doFetch(25);
+    });
+  }, [doFetch]);
+
+  // Refetch when budget changes via user tap
+  useEffect(() => {
+    if (!hasData.current) return; // Skip initial mount
+    doFetch(budget);
+  }, [budget, doFetch]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     hasData.current = false;
-    await fetchAll(true);
-  }, [fetchAll]);
+    await doFetch(budget, true);
+  }, [doFetch, budget]);
 
   // Only show full-screen skeleton on first load (no data yet)
   if (loading && !hasData.current) return <DealsSkeleton />;
-  if (error && !hasData.current) return <EmptyState icon="cloud-offline-outline" message={t.deals.error} submessage={error} onRetry={() => { hasData.current = false; fetchAll(); }} />;
+  if (error && !hasData.current) return <EmptyState icon="cloud-offline-outline" message={t.deals.error} submessage={error} onRetry={() => { hasData.current = false; doFetch(budget); }} />;
 
   return (
     <ScrollView
