@@ -1,11 +1,14 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
 import { analyzeWineLabel } from '@/services/chat';
 import { useTranslation } from '@/i18n';
+
+let Haptics: any = null;
+try { Haptics = require('expo-haptics'); } catch {}
 
 let CameraViewComponent: any = null;
 let useCameraPermissions: any = null;
@@ -50,25 +53,42 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
 
-  const handleBarcodeScan = useCallback(({ data }: { data: string }) => {
+  const [scanStatus, setScanStatus] = useState<string>('');
+
+  const handleBarcodeScan = useCallback(({ data, type }: { data: string; type?: string }) => {
     // Use ref to prevent duplicate scans (avoids stale closure with state)
     if (scannedRef.current) return;
     scannedRef.current = true;
     setScanned(true);
 
+    // Haptic feedback on scan
+    try { Haptics?.impactAsync?.(Haptics.ImpactFeedbackStyle?.Medium); } catch {}
+
+    setScanStatus(`Code détecté: ${data}`);
+
     (async () => {
       try {
+        setScanStatus(`Recherche de ${data}...`);
         // Try local DB first
         const result = await saqApi.search({ query: data, limit: 1 });
         if (result.wines.length > 0) {
           router.replace({ pathname: '/wine/[id]', params: { id: result.wines[0].id } });
           return;
         }
-        // Fallback: live search on saq.com
+        // Fallback: live search on saq.com (supports SAQ codes + EAN barcodes)
+        setScanStatus(`Recherche sur SAQ.com...`);
         const browseResult = await saqApi.browse(data);
         if (browseResult.wines && browseResult.wines.length > 0) {
-          router.replace({ pathname: '/wine/[id]', params: { id: browseResult.wines[0].id } });
-          return;
+          const wine = browseResult.wines[0];
+          if (wine.id) {
+            router.replace({ pathname: '/wine/[id]', params: { id: wine.id } });
+            return;
+          }
+          // If no ID but has a SAQ URL, open it
+          if (wine.saqUrl) {
+            Linking.openURL(wine.saqUrl);
+            return;
+          }
         }
         setNotFoundQuery(data);
       } catch {
@@ -107,6 +127,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     setNotFoundQuery(null);
     setScanned(false);
     scannedRef.current = false;
+    setScanStatus('');
   }, []);
 
   const switchToBarcode = useCallback(() => {
@@ -167,6 +188,13 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         {mode === 'barcode' && !scanned && !analyzing && (
           <View style={styles.scanLineWrap}>
             <View style={styles.scanLine} />
+            <Text style={styles.scanHint}>{t.camera.scanning}</Text>
+          </View>
+        )}
+        {scanStatus !== '' && (
+          <View style={styles.scanStatusWrap}>
+            <ActivityIndicator size="small" color={COLORS.white} />
+            <Text style={styles.scanStatusText}>{scanStatus}</Text>
           </View>
         )}
       </View>
@@ -266,6 +294,32 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: COLORS.burgundy,
     opacity: 0.8,
+  },
+  scanHint: {
+    color: COLORS.white,
+    fontSize: 13,
+    marginTop: SPACING.md,
+    textAlign: 'center',
+    opacity: 0.7,
+  },
+  scanStatusWrap: {
+    position: 'absolute',
+    bottom: SPACING.md,
+    left: SPACING.md,
+    right: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+  },
+  scanStatusText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '600',
   },
   analyzingOverlay: { alignItems: 'center', gap: SPACING.sm },
   analyzingText: { color: COLORS.white, fontSize: 15, fontWeight: '600' },
