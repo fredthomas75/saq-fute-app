@@ -33,9 +33,10 @@ function StackNavigator() {
         headerStyle: { backgroundColor: COLORS.burgundy },
         headerTintColor: COLORS.white,
         headerTitleStyle: { fontWeight: '700' },
+        headerBackTitle: t.common.back,
       }}
     >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, headerBackTitle: t.common.back }} />
       <Stack.Screen name="wine/[id]" options={{ title: t.wineDetail.title }} />
       <Stack.Screen name="settings" options={{ title: t.settings.title }} />
       <Stack.Screen name="cellar" options={{ title: t.cellar.title }} />

@@ -249,6 +249,7 @@ export const fr = {
     removedFromWishlist: 'Retiré de la liste',
     addedToCellar: 'Ajouté à la cave',
     noteSaved: 'Note sauvegardée',
+    back: 'Retour',
   },
 
   wineTypes: {

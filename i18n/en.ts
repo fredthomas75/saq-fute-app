@@ -251,6 +251,7 @@ export const en: typeof fr = {
     removedFromWishlist: 'Removed from list',
     addedToCellar: 'Added to cellar',
     noteSaved: 'Note saved',
+    back: 'Back',
   },
 
   wineTypes: {
