@@ -167,11 +167,13 @@ export default function WineCard({ wine, compact }: Props) {
             <Text style={styles.originalPrice}>{wine.originalPrice.toFixed(2)}$</Text>
           )}
         </View>
-        <View style={[styles.dealBadge, { backgroundColor: wine.dealScore >= 95 ? COLORS.gold : wine.dealScore >= 88 ? COLORS.green : COLORS.grayLight }]}>
-          <Text style={[styles.dealText, { color: wine.dealScore >= 88 ? COLORS.white : COLORS.grayDark }]}>
-            {wine.dealLabel}
-          </Text>
-        </View>
+        {wine.dealScore >= 80 && (
+          <View style={[styles.dealBadge, { backgroundColor: wine.dealScore >= 95 ? COLORS.gold : wine.dealScore >= 88 ? COLORS.green : COLORS.burgundy + '18' }]}>
+            <Text style={[styles.dealText, { color: wine.dealScore >= 88 ? COLORS.white : COLORS.burgundy }]}>
+              {wine.dealScore >= 95 ? '🏆 TROUVAILLE!' : wine.dealScore >= 88 ? '🔥 Aubaine' : '👍 Bon rapport Q/P'}
+            </Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );

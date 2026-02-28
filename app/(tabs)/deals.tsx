@@ -18,6 +18,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 interface CacheData {
   coeurs: Wine[];
   deals: Wine[];
+  sweetSpot: Wine[];
   promos: Wine[];
   budget: number;
   timestamp: number;
@@ -44,18 +45,17 @@ export default function DealsScreen() {
     return a;
   };
 
-  // Sort deals: prioritize wines in the "sweet spot" range
-  // e.g. for budget 25$, show 20-25$ wines first, then the rest
-  const sortByBudgetRange = (wines: Wine[], b: number): Wine[] => {
+  // Get the price floor for a budget (previous tier)
+  const getFloor = (b: number) => {
     const idx = BUDGETS.indexOf(b as typeof BUDGETS[number]);
-    const floor = idx > 0 ? BUDGETS[idx - 1] : 0;
-    return [...wines].sort((wA, wB) => {
-      const inRangeA = wA.price > floor && wA.price <= b;
-      const inRangeB = wB.price > floor && wB.price <= b;
-      if (inRangeA && !inRangeB) return -1;
-      if (!inRangeA && inRangeB) return 1;
-      return wB.price - wA.price; // within same group, higher price first
-    });
+    return idx > 0 ? BUDGETS[idx - 1] : 0;
+  };
+
+  // Merge sweet-spot wines with deals: sweet-spot first, then remaining deals (deduped)
+  const mergeDeals = (sweetSpot: Wine[], deals: Wine[]): Wine[] => {
+    const seen = new Set(sweetSpot.map(w => w.id));
+    const rest = deals.filter(w => !seen.has(w.id));
+    return [...sweetSpot, ...rest].slice(0, 10);
   };
 
   // Persist budget when changed
@@ -77,7 +77,7 @@ export default function DealsScreen() {
           const data: CacheData = JSON.parse(cached);
           if (Date.now() - data.timestamp < CACHE_TTL && data.budget === b) {
             setCoeurs(shuffle(data.coeurs).slice(0, 10));
-            setDeals(sortByBudgetRange(data.deals, b));
+            setDeals(mergeDeals(data.sweetSpot || [], data.deals));
             setPromos(data.promos);
             hasData.current = true;
             setLoading(false);
@@ -86,14 +86,19 @@ export default function DealsScreen() {
         }
       }
 
-      const [coeurRes, dealsRes, promoRes] = await Promise.all([
+      const floor = getFloor(b);
+      const [coeurRes, dealsRes, sweetRes, promoRes] = await Promise.all([
         saqApi.coeur({ limit: 30 }),
         saqApi.deals({ budget: b, limit: 10 }),
+        // Fetch wines in the sweet-spot range (e.g. 20-25$ for budget 25$)
+        floor > 0
+          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5 })
+          : Promise.resolve({ wines: [] as Wine[] } as any),
         saqApi.search({ onlySale: true, limit: 10 }),
       ]);
 
       setCoeurs(shuffle(coeurRes.wines).slice(0, 10));
-      setDeals(sortByBudgetRange(dealsRes.wines, b));
+      setDeals(mergeDeals(sweetRes.wines || [], dealsRes.wines));
       setPromos(promoRes.wines);
       hasData.current = true;
 
@@ -101,6 +106,7 @@ export default function DealsScreen() {
       AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
         coeurs: coeurRes.wines,
         deals: dealsRes.wines,
+        sweetSpot: sweetRes.wines || [],
         promos: promoRes.wines,
         budget: b,
         timestamp: Date.now(),
