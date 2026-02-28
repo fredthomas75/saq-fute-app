@@ -14,7 +14,14 @@
       "backgroundColor": "#FFF8F0"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fredthomas.saqfute",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "SAQ Futé utilise la caméra pour scanner les codes-barres et étiquettes de vin.",
+        "NSPhotoLibraryUsageDescription": "SAQ Futé accède à vos photos pour scanner les menus de restaurant.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
