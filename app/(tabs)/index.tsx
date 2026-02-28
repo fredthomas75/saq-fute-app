@@ -1,20 +1,22 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, FlatList, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
+import { searchCache } from '@/services/searchCache';
+import SearchCacheClass from '@/services/searchCache';
 import type { Wine } from '@/types/wine';
 import { useTranslation } from '@/i18n';
 import { useSearchHistory } from '@/context/SearchHistoryContext';
 import { useTasteProfile } from '@/context/TasteProfileContext';
 import SearchBar from '@/components/SearchBar';
-import FilterChip from '@/components/FilterChip';
 import WineCard from '@/components/WineCard';
 import EmptyState from '@/components/EmptyState';
-import LoadingState from '@/components/LoadingState';
+import SkeletonLoader from '@/components/SkeletonLoader';
+import FilterBottomSheet, { FilterState } from '@/components/FilterBottomSheet';
 
-const WINE_TYPES = ['Rouge', 'Blanc', 'Rosé', 'Mousseux'];
+const CARD_HEIGHT = 170;
 
 export default function SearchScreen() {
   const t = useTranslation();
@@ -23,117 +25,161 @@ export default function SearchScreen() {
   const { profile } = useTasteProfile();
   const params = useLocalSearchParams<{ query?: string }>();
   const [query, setQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<string | undefined>();
-  const [onlySale, setOnlySale] = useState(false);
-  const [onlyOrganic, setOnlyOrganic] = useState(false);
-  const [onlyExpert, setOnlyExpert] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({ onlySale: false, onlyOrganic: false, onlyExpert: false });
   const [results, setResults] = useState<Wine[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stateRef = useRef({ query: '', selectedType: undefined as string | undefined, onlySale: false, onlyOrganic: false, onlyExpert: false });
+  const queryRef = useRef('');
 
-  const doSearch = useCallback(async () => {
-    const s = stateRef.current;
+  const doSearch = useCallback(async (forceRefresh = false) => {
+    const searchParams: any = {
+      query: queryRef.current || undefined,
+      type: filters.type,
+      onlySale: filters.onlySale || undefined,
+      onlyOrganic: filters.onlyOrganic || undefined,
+      vip: filters.onlyExpert || undefined,
+      limit: 20,
+    };
+
+    // Check cache first (unless forced refresh)
+    const cacheKey = SearchCacheClass.makeKey(searchParams);
+    if (!forceRefresh) {
+      const cached = searchCache.get(cacheKey);
+      if (cached) {
+        setResults(cached.wines);
+        setHasSearched(true);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const data = await saqApi.search({
-        query: s.query || undefined,
-        type: s.selectedType,
-        onlySale: s.onlySale || undefined,
-        onlyOrganic: s.onlyOrganic || undefined,
-        vip: s.onlyExpert || undefined,
-        limit: 20,
-      });
+      const data = await saqApi.search(searchParams);
       setResults(data.wines);
       setHasSearched(true);
-      if (s.query && s.query.length >= 2) {
-        addEntry(s.query, data.wines.length);
+      searchCache.set(cacheKey, data);
+      if (queryRef.current && queryRef.current.length >= 2) {
+        addEntry(queryRef.current, data.wines.length);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [t, addEntry]);
+  }, [filters, t, addEntry]);
 
   // Handle incoming query param from map country click
   useEffect(() => {
     if (params.query) {
       setQuery(params.query);
-      stateRef.current.query = params.query;
+      queryRef.current = params.query;
       doSearch();
     }
   }, [params.query, doSearch]);
 
   const handleQueryChange = useCallback((text: string) => {
     setQuery(text);
-    stateRef.current.query = text;
+    queryRef.current = text;
     if (timerRef.current) clearTimeout(timerRef.current);
     if (text.length >= 2) {
-      timerRef.current = setTimeout(doSearch, 400);
+      timerRef.current = setTimeout(() => doSearch(), 400);
     }
   }, [doSearch]);
 
-  const toggleType = (type: string) => {
-    const newType = selectedType === type ? undefined : type;
-    setSelectedType(newType);
-    stateRef.current.selectedType = newType;
-    doSearch();
-  };
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    doSearch(true);
+  }, [doSearch]);
 
-  const toggleSale = () => {
-    const next = !onlySale;
-    setOnlySale(next);
-    stateRef.current.onlySale = next;
-    doSearch();
-  };
+  const handleApplyFilters = useCallback((newFilters: FilterState) => {
+    setFilters(newFilters);
+    // doSearch will re-run due to filters dependency
+  }, []);
 
-  const toggleOrganic = () => {
-    const next = !onlyOrganic;
-    setOnlyOrganic(next);
-    stateRef.current.onlyOrganic = next;
-    doSearch();
-  };
-
-  const toggleExpert = () => {
-    const next = !onlyExpert;
-    setOnlyExpert(next);
-    stateRef.current.onlyExpert = next;
-    doSearch();
-  };
+  // Re-run search when filters change (if user has searched)
+  useEffect(() => {
+    if (hasSearched || filters.type || filters.onlySale || filters.onlyOrganic || filters.onlyExpert) {
+      doSearch();
+    }
+  }, [filters]);
 
   const handleHistoryTap = (q: string) => {
     setQuery(q);
-    stateRef.current.query = q;
+    queryRef.current = q;
     doSearch();
   };
 
+  const activeFilterCount = [filters.type, filters.onlySale, filters.onlyOrganic, filters.onlyExpert].filter(Boolean).length;
+
+  // FlatList optimization: fixed item height
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: CARD_HEIGHT,
+    offset: CARD_HEIGHT * index,
+    index,
+  }), []);
+
   return (
     <View style={styles.container}>
+      {/* Search row with filter button */}
       <View style={styles.searchRow}>
         <View style={styles.searchBarWrap}>
           <SearchBar
             value={query}
             onChangeText={handleQueryChange}
-            onSubmit={doSearch}
+            onSubmit={() => doSearch()}
             placeholder={t.search.placeholder}
           />
         </View>
+        <Pressable onPress={() => setShowFilters(true)} style={styles.filterBtn} hitSlop={8}>
+          <Ionicons name="options-outline" size={22} color={COLORS.burgundy} />
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </Pressable>
         <Pressable onPress={() => router.push('/camera')} style={styles.scanBtn} hitSlop={8}>
           <Ionicons name="scan-outline" size={22} color={COLORS.burgundy} />
         </Pressable>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filtersContent}>
-        {WINE_TYPES.map((type) => (
-          <FilterChip key={type} label={type} active={selectedType === type} onPress={() => toggleType(type)} />
+      {/* Quick type pills — fixed height, no overlap */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filters}
+        contentContainerStyle={styles.filtersContent}
+      >
+        {(['Rouge', 'Blanc', 'Rosé', 'Mousseux'] as const).map((type) => (
+          <Pressable
+            key={type}
+            onPress={() => setFilters((f) => ({ ...f, type: f.type === type ? undefined : type }))}
+            style={[styles.filterChip, filters.type === type && styles.filterChipActive]}
+          >
+            <Text style={[styles.filterChipText, filters.type === type && styles.filterChipTextActive]}>
+              {t.wineTypes[type] || type}
+            </Text>
+          </Pressable>
         ))}
-        <FilterChip label={t.search.promo} active={onlySale} onPress={toggleSale} />
-        <FilterChip label={t.search.organic} active={onlyOrganic} onPress={toggleOrganic} />
-        <FilterChip label={t.search.expertPick} active={onlyExpert} onPress={toggleExpert} />
+        <Pressable
+          onPress={() => setFilters((f) => ({ ...f, onlySale: !f.onlySale }))}
+          style={[styles.filterChip, filters.onlySale && styles.filterChipActive]}
+        >
+          <Text style={[styles.filterChipText, filters.onlySale && styles.filterChipTextActive]}>{t.search.promo}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setFilters((f) => ({ ...f, onlyOrganic: !f.onlyOrganic }))}
+          style={[styles.filterChip, filters.onlyOrganic && styles.filterChipActive]}
+        >
+          <Text style={[styles.filterChipText, filters.onlyOrganic && styles.filterChipTextActive]}>{t.search.organic}</Text>
+        </Pressable>
       </ScrollView>
 
       {/* Quiz banner */}
@@ -171,9 +217,10 @@ export default function SearchScreen() {
         </View>
       )}
 
-      {loading && <LoadingState message={t.search.loading} />}
+      {/* Skeleton loading */}
+      {loading && !refreshing && <SkeletonLoader count={4} />}
 
-      {error && <EmptyState icon="cloud-offline-outline" message={t.search.connectionError} submessage={error} onRetry={doSearch} />}
+      {error && <EmptyState icon="cloud-offline-outline" message={t.search.connectionError} submessage={error} onRetry={() => doSearch()} />}
 
       {!loading && !error && hasSearched && results.length === 0 && (
         <EmptyState message={t.search.noResults} submessage={t.search.noResultsSub} />
@@ -190,8 +237,22 @@ export default function SearchScreen() {
           renderItem={({ item }) => <WineCard wine={item} />}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          getItemLayout={getItemLayout}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.burgundy} />
+          }
         />
       )}
+
+      {/* Bottom sheet filters */}
+      <FilterBottomSheet
+        visible={showFilters}
+        onClose={() => setShowFilters(false)}
+        onApply={handleApplyFilters}
+        initialFilters={filters}
+      />
     </View>
   );
 }
@@ -205,9 +266,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingRight: SPACING.md,
+    gap: 6,
   },
   searchBarWrap: {
     flex: 1,
+  },
+  filterBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.burgundy,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: '700',
   },
   scanBtn: {
     width: 40,
@@ -218,11 +304,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   filters: {
-    maxHeight: 50,
+    flexGrow: 0,
+    flexShrink: 0,
+    minHeight: 44,
   },
   filtersContent: {
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.sm,
+    gap: SPACING.sm,
+    alignItems: 'center',
+  },
+  filterChip: {
+    paddingHorizontal: SPACING.sm + 2,
+    paddingVertical: SPACING.xs + 1,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.grayLight,
+    backgroundColor: COLORS.white,
+  },
+  filterChipActive: {
+    backgroundColor: COLORS.burgundy,
+    borderColor: COLORS.burgundy,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.grayDark,
+  },
+  filterChipTextActive: {
+    color: COLORS.white,
   },
   list: {
     paddingBottom: SPACING.xl,

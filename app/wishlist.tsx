@@ -24,8 +24,8 @@ export default function WishlistScreen() {
       <View style={styles.container}>
         <EmptyState
           icon="bookmark-outline"
-          message={t.wishlist?.empty || 'Votre liste est vide'}
-          submessage={t.wishlist?.emptySub || 'Ajoutez des vins que vous aimeriez goûter'}
+          message={t.wishlist.empty}
+          submessage={t.wishlist.emptySub}
         />
       </View>
     );

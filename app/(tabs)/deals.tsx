@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
 import type { Wine } from '@/types/wine';
@@ -17,6 +17,7 @@ export default function DealsScreen() {
   const [deals, setDeals] = useState<Wine[]>([]);
   const [promos, setPromos] = useState<Wine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
@@ -44,7 +45,18 @@ export default function DealsScreen() {
   if (error) return <EmptyState icon="cloud-offline-outline" message={t.deals.error} submessage={error} onRetry={fetchAll} />;
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => { setRefreshing(true); await fetchAll(); setRefreshing(false); }}
+          tintColor={COLORS.burgundy}
+          colors={[COLORS.burgundy]}
+        />
+      }
+    >
       {/* Budget selector */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.budgetRow}>
         {BUDGETS.map((b) => (

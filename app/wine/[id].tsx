@@ -8,7 +8,9 @@ import { useFavorites } from '@/context/FavoritesContext';
 import { useCellar } from '@/context/CellarContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useWineNotes } from '@/context/WineNotesContext';
+import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/i18n';
+import { hapticLight, hapticSuccess } from '@/services/haptics';
 import type { Wine } from '@/types/wine';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
@@ -21,6 +23,7 @@ export default function WineDetailScreen() {
   const { isInCellar, addToCellar } = useCellar();
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const { getNote, setNote } = useWineNotes();
+  const { showToast } = useToast();
   const [wine, setWine] = useState<Wine | null>(null);
   const [conseil, setConseil] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -59,11 +62,14 @@ export default function WineDetailScreen() {
   const handleSaveNote = () => {
     if (noteText.trim() || noteRating > 0) {
       setNote(wine.id, wine.name, noteText.trim(), noteRating || undefined);
+      hapticSuccess();
+      showToast(t.toast.noteSaved);
     }
     setEditingNote(false);
   };
 
   const handleRating = (star: number) => {
+    hapticLight();
     const newRating = star === noteRating ? 0 : star;
     setNoteRating(newRating);
     if (noteText.trim() || newRating > 0) {
@@ -87,7 +93,7 @@ export default function WineDetailScreen() {
       {/* Header badges */}
       <View style={styles.badges}>
         <View style={[styles.typePill, { backgroundColor: wine.type === 'Rouge' ? '#722F37' : wine.type === 'Blanc' ? '#C5A572' : wine.type === 'Rosé' ? '#E8A0BF' : '#7FB3D8' }]}>
-          <Text style={styles.typePillText}>{wine.type}</Text>
+          <Text style={styles.typePillText}>{t.wineTypes[wine.type] || wine.type}</Text>
         </View>
         {wine.isOrganic && <Text style={styles.badge}>{t.wineDetail.bio}</Text>}
         {wine.coeurBadge && <Text style={styles.badge}>{t.wineDetail.coupDeCoeur}</Text>}
@@ -160,7 +166,7 @@ export default function WineDetailScreen() {
 
       {/* Actions */}
       <View style={styles.actions}>
-        <Pressable onPress={() => fav ? removeFavorite(wine.id) : addFavorite(wine)} style={[styles.actionBtn, styles.favBtn]}>
+        <Pressable onPress={() => { hapticLight(); if (fav) { removeFavorite(wine.id); showToast(t.toast.favoriteRemoved); } else { addFavorite(wine); showToast(t.toast.favoriteAdded); } }} style={[styles.actionBtn, styles.favBtn]}>
           <Ionicons name={fav ? 'heart' : 'heart-outline'} size={20} color={fav ? COLORS.red : COLORS.burgundy} />
           <Text style={styles.actionText}>{fav ? t.wineDetail.remove : t.wineDetail.favorite}</Text>
         </Pressable>
@@ -178,14 +184,14 @@ export default function WineDetailScreen() {
           <Text style={styles.secondaryText}>{t.wineDetail.share}</Text>
         </Pressable>
 
-        <Pressable onPress={() => wished ? removeFromWishlist(wine.id) : addToWishlist(wine)} style={[styles.secondaryBtn, wished && styles.secondaryBtnActive]}>
+        <Pressable onPress={() => { hapticLight(); if (wished) { removeFromWishlist(wine.id); showToast(t.toast.wishlistRemoved); } else { addToWishlist(wine); showToast(t.toast.wishlistAdded); } }} style={[styles.secondaryBtn, wished && styles.secondaryBtnActive]}>
           <Ionicons name={wished ? 'bookmark' : 'bookmark-outline'} size={18} color={wished ? COLORS.gold : COLORS.burgundy} />
           <Text style={[styles.secondaryText, wished && { color: COLORS.gold }]}>
-            {wished ? (t.wishlist?.inList || 'Dans ma liste') : (t.wishlist?.add || 'À essayer')}
+            {wished ? t.wishlist.inList : t.wishlist.add}
           </Text>
         </Pressable>
 
-        <Pressable onPress={() => !inCellar && addToCellar(wine)} style={[styles.secondaryBtn, inCellar && styles.secondaryBtnActive]}>
+        <Pressable onPress={() => { if (!inCellar) { hapticLight(); addToCellar(wine); showToast(t.toast.cellarAdded); } }} style={[styles.secondaryBtn, inCellar && styles.secondaryBtnActive]}>
           <Ionicons name={inCellar ? 'checkmark-circle' : 'wine-outline'} size={18} color={inCellar ? COLORS.gold : COLORS.burgundy} />
           <Text style={[styles.secondaryText, inCellar && { color: COLORS.gold }]}>
             {inCellar ? t.cellar.inCellar : t.cellar.addToCellar}
@@ -195,11 +201,11 @@ export default function WineDetailScreen() {
 
       {/* My Notes */}
       <View style={styles.notesSection}>
-        <Text style={styles.sectionTitle}>{t.wineNotes?.myNotes || 'Mes notes'}</Text>
+        <Text style={styles.sectionTitle}>{t.wineNotes.myNotes}</Text>
 
         {/* Star rating */}
         <View style={styles.starsRow}>
-          <Text style={styles.starsLabel}>{t.wineNotes?.myRating || 'Ma note'}</Text>
+          <Text style={styles.starsLabel}>{t.wineNotes.myRating}</Text>
           <View style={styles.stars}>
             {[1, 2, 3, 4, 5].map((star) => (
               <Pressable key={star} onPress={() => handleRating(star)} hitSlop={6}>
@@ -218,7 +224,7 @@ export default function WineDetailScreen() {
             style={styles.noteInput}
             value={noteText}
             onChangeText={setNoteText}
-            placeholder={t.wineNotes?.placeholder || 'Vos impressions sur ce vin...'}
+            placeholder={t.wineNotes.placeholder}
             placeholderTextColor={COLORS.gray}
             multiline
             autoFocus
@@ -232,7 +238,7 @@ export default function WineDetailScreen() {
         ) : (
           <Pressable onPress={() => setEditingNote(true)} style={styles.addNoteBtn}>
             <Ionicons name="create-outline" size={18} color={COLORS.burgundy} />
-            <Text style={styles.addNoteText}>{t.wineNotes?.addNote || 'Ajouter une note'}</Text>
+            <Text style={styles.addNoteText}>{t.wineNotes.addNote}</Text>
           </Pressable>
         )}
       </View>

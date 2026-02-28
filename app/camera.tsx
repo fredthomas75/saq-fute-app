@@ -30,7 +30,7 @@ export default function CameraScreen() {
       <View style={styles.fallback}>
         <Ionicons name="camera-outline" size={64} color={COLORS.gray} />
         <Text style={styles.fallbackText}>{t.camera.permissionTitle}</Text>
-        <Text style={styles.fallbackSub}>expo-camera not installed</Text>
+        <Text style={styles.fallbackSub}>{t.camera.notInstalled}</Text>
         <Pressable onPress={() => router.back()} style={styles.backBtnFallback}>
           <Text style={styles.backBtnText}>OK</Text>
         </Pressable>
@@ -55,7 +55,7 @@ export default function CameraScreen() {
             <Text style={styles.grantBtnText}>{t.camera.grant}</Text>
           </Pressable>
           <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
-            <Text style={styles.cancelBtnText}>{t.camera.cancel || 'Annuler'}</Text>
+            <Text style={styles.cancelBtnText}>{t.camera.cancel}</Text>
           </Pressable>
         </View>
       );
@@ -147,10 +147,10 @@ export default function CameraScreen() {
             <Text style={styles.notFoundSub}>{t.camera.notFoundSub}</Text>
             <Pressable onPress={handleOpenSAQ} style={styles.saqBtn}>
               <Ionicons name="open-outline" size={18} color={COLORS.white} />
-              <Text style={styles.saqBtnText}>{t.camera.searchSAQ || 'Chercher sur SAQ.com'}</Text>
+              <Text style={styles.saqBtnText}>{t.camera.searchSAQ}</Text>
             </Pressable>
             <Pressable onPress={handleRetry} style={styles.retryBtn}>
-              <Text style={styles.retryBtnText}>{t.camera.retry || 'Réessayer'}</Text>
+              <Text style={styles.retryBtnText}>{t.camera.retry}</Text>
             </Pressable>
           </View>
         )}

@@ -99,12 +99,14 @@ export default function MapScreen() {
   if (loading) return <LoadingState message={t.map.loading} />;
 
   const mapTranslations = {
-    backToWorld: t.map.backToWorld || 'Monde',
-    seeAllWines: t.map.seeAllWines || 'Voir tous les vins',
-    loadingRegions: t.map.loadingRegions || 'Chargement des régions...',
-    noRegions: t.map.noRegions || 'Aucune région trouvée',
+    backToWorld: t.map.backToWorld,
+    seeAllWines: t.map.seeAllWines,
+    loadingRegions: t.map.loadingRegions,
+    noRegions: t.map.noRegions,
     wines: t.map.wines,
     regions: t.map.regions,
+    mapLoading: t.map.mapLoading,
+    mapError: t.map.mapError,
   };
 
   return (

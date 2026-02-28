@@ -75,7 +75,7 @@ export default function QuizScreen() {
                 style={[styles.optionCard, types.includes(type) && styles.optionCardActive]}
               >
                 <Text style={styles.optionEmoji}>{TYPE_EMOJIS[type]}</Text>
-                <Text style={[styles.optionLabel, types.includes(type) && styles.optionLabelActive]}>{type}</Text>
+                <Text style={[styles.optionLabel, types.includes(type) && styles.optionLabelActive]}>{t.wineTypes[type] || type}</Text>
               </Pressable>
             ))}
           </View>

@@ -6,6 +6,9 @@ import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useWineNotes } from '@/context/WineNotesContext';
+import { useToast } from '@/context/ToastContext';
+import { useTranslation } from '@/i18n';
+import { hapticLight } from '@/services/haptics';
 import type { Wine } from '@/types/wine';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -29,9 +32,11 @@ interface Props {
 
 export default function WineCard({ wine, compact }: Props) {
   const router = useRouter();
+  const t = useTranslation();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const { getNote } = useWineNotes();
+  const { showToast } = useToast();
   const fav = isFavorite(wine.id);
   const wished = isInWishlist(wine.id);
   const userNote = getNote(wine.id);
@@ -41,17 +46,30 @@ export default function WineCard({ wine, compact }: Props) {
   };
 
   const toggleFav = () => {
-    if (fav) removeFavorite(wine.id);
-    else addFavorite(wine);
+    hapticLight();
+    if (fav) {
+      removeFavorite(wine.id);
+      showToast(t.toast.favoriteRemoved);
+    } else {
+      addFavorite(wine);
+      showToast(t.toast.favoriteAdded);
+    }
   };
 
   const toggleWish = () => {
-    if (wished) removeFromWishlist(wine.id);
-    else addToWishlist(wine);
+    hapticLight();
+    if (wished) {
+      removeFromWishlist(wine.id);
+      showToast(t.toast.wishlistRemoved);
+    } else {
+      addToWishlist(wine);
+      showToast(t.toast.wishlistAdded);
+    }
   };
 
   const flag = COUNTRY_FLAGS[wine.country] || '🍷';
   const typeColor = TYPE_COLORS[wine.type] || COLORS.gray;
+  const typeLabel = t.wineTypes[wine.type] || wine.type;
 
   if (compact) {
     return (
@@ -60,7 +78,7 @@ export default function WineCard({ wine, compact }: Props) {
         <Text style={styles.compactPrice}>{wine.price?.toFixed(2)}$</Text>
         <View style={styles.compactBottom}>
           <View style={[styles.typePill, { backgroundColor: typeColor }]}>
-            <Text style={styles.typePillText}>{wine.type}</Text>
+            <Text style={styles.typePillText}>{typeLabel}</Text>
           </View>
           {userNote?.rating && userNote.rating > 0 && (
             <View style={styles.compactStars}>
@@ -79,11 +97,11 @@ export default function WineCard({ wine, compact }: Props) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={[styles.typePill, { backgroundColor: typeColor }]}>
-            <Text style={styles.typePillText}>{wine.type}</Text>
+            <Text style={styles.typePillText}>{typeLabel}</Text>
           </View>
           {wine.coeurBadge && <Text style={styles.coeurBadge}>❤️</Text>}
           {wine.isOrganic && <Text style={styles.organicBadge}>🌿</Text>}
-          {wine.onSale && <Text style={styles.saleBadge}>PROMO</Text>}
+          {wine.onSale && <Text style={styles.saleBadge}>{t.common.sale}</Text>}
         </View>
         <View style={styles.headerActions}>
           <Pressable onPress={toggleWish} hitSlop={8}>

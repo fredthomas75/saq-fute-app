@@ -11,7 +11,9 @@ import { CellarProvider } from '@/context/CellarContext';
 import { TasteProfileProvider } from '@/context/TasteProfileContext';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { WineNotesProvider } from '@/context/WineNotesContext';
+import { ToastProvider } from '@/context/ToastContext';
 import { COLORS } from '@/constants/theme';
+import { useTranslation } from '@/i18n';
 import 'react-native-reanimated';
 
 export { ErrorBoundary } from 'expo-router';
@@ -21,6 +23,32 @@ export const unstable_settings = {
 };
 
 SplashScreen.preventAutoHideAsync();
+
+function StackNavigator() {
+  const t = useTranslation();
+
+  return (
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: COLORS.burgundy },
+        headerTintColor: COLORS.white,
+        headerTitleStyle: { fontWeight: '700' },
+      }}
+    >
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="wine/[id]" options={{ title: t.wineDetail.title }} />
+      <Stack.Screen name="settings" options={{ title: t.settings.title }} />
+      <Stack.Screen name="cellar" options={{ title: t.cellar.title }} />
+      <Stack.Screen name="quiz" options={{ title: t.quiz.title, presentation: 'modal' }} />
+      <Stack.Screen name="camera" options={{ title: t.camera.title, headerShown: false }} />
+      <Stack.Screen name="menu-scan" options={{ title: t.menuScan.title }} />
+      <Stack.Screen name="map" options={{ title: t.map.title }} />
+      <Stack.Screen name="country-wines" options={{ title: t.map.wines }} />
+      <Stack.Screen name="wishlist" options={{ title: t.wishlist.title }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -46,25 +74,10 @@ export default function RootLayout() {
             <WishlistProvider>
             <WineNotesProvider>
             <TasteProfileProvider>
+            <ToastProvider>
               <StatusBar style="light" />
-              <Stack
-                screenOptions={{
-                  headerStyle: { backgroundColor: COLORS.burgundy },
-                  headerTintColor: COLORS.white,
-                  headerTitleStyle: { fontWeight: '700' },
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="wine/[id]" options={{ title: 'Détails du vin' }} />
-                <Stack.Screen name="settings" options={{ title: 'Réglages' }} />
-                <Stack.Screen name="cellar" options={{ title: 'Ma cave' }} />
-                <Stack.Screen name="quiz" options={{ title: 'Quiz', presentation: 'modal' }} />
-                <Stack.Screen name="camera" options={{ title: 'Scanner', headerShown: false }} />
-                <Stack.Screen name="menu-scan" options={{ title: 'Menu' }} />
-                <Stack.Screen name="map" options={{ title: 'Carte des vins' }} />
-                <Stack.Screen name="country-wines" options={{ title: 'Vins' }} />
-                <Stack.Screen name="wishlist" options={{ title: 'À essayer' }} />
-              </Stack>
+              <StackNavigator />
+            </ToastProvider>
             </TasteProfileProvider>
             </WineNotesProvider>
             </WishlistProvider>

@@ -103,7 +103,7 @@ export default function WineListSort({ sortBy, onSortChange, filterType, onFilte
               onPress={() => onFilterChange(filterType === type ? undefined : type)}
               style={[styles.typeChip, filterType === type && styles.typeChipActive]}
             >
-              <Text style={[styles.typeChipText, filterType === type && styles.typeChipTextActive]}>{type}</Text>
+              <Text style={[styles.typeChipText, filterType === type && styles.typeChipTextActive]}>{t.wineTypes[type] || type}</Text>
             </Pressable>
           ))}
         </ScrollView>

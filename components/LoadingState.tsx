@@ -7,11 +7,11 @@ interface Props {
   message?: string;
 }
 
-export default function LoadingState({ message = 'Chargement...' }: Props) {
+export default function LoadingState({ message }: Props) {
   return (
     <View style={styles.container}>
       <WineGlassLoader size={80} />
-      <Text style={styles.text}>{message}</Text>
+      {message ? <Text style={styles.text}>{message}</Text> : null}
     </View>
   );
 }

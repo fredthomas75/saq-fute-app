@@ -72,7 +72,7 @@ export default function MenuScanScreen() {
           </Pressable>
 
           {!ImagePicker && (
-            <Text style={styles.noLib}>expo-image-picker not installed</Text>
+            <Text style={styles.noLib}>{t.menuScan.notInstalled}</Text>
           )}
         </View>
       </View>

@@ -20,6 +20,7 @@ export const en: typeof fr = {
     promo: '🏷️ Sale',
     organic: '🌿 Organic',
     expertPick: '⭐ 90+',
+    filters: 'Filters',
   },
 
   deals: {
@@ -126,6 +127,7 @@ export const en: typeof fr = {
     version: 'Version',
     appName: 'SAQ Futé',
     appDescription: 'Find the best wines at the best prices at SAQ.',
+    appTagline: 'Drink better, spend less',
     madeIn: 'Made with ❤️ in Quebec',
   },
 
@@ -192,6 +194,7 @@ export const en: typeof fr = {
     permissionMsg: 'To scan barcodes and labels',
     grant: 'Grant',
     cancel: 'Cancel',
+    notInstalled: 'Camera not available',
   },
 
   menuScan: {
@@ -204,6 +207,7 @@ export const en: typeof fr = {
     searchWines: 'Search these wines',
     noResults: 'Unable to read menu',
     tryAgain: 'Try again',
+    notInstalled: 'Gallery not available',
   },
 
   map: {
@@ -218,6 +222,7 @@ export const en: typeof fr = {
     countryCount: 'wine countries',
     tapToExplore: 'Tap a colored country to explore its wines',
     mapError: 'Unable to load map',
+    mapLoading: 'Loading map...',
     backToWorld: 'World',
     seeAllWines: 'See all wines',
     loadingRegions: 'Loading regions...',
@@ -239,6 +244,25 @@ export const en: typeof fr = {
     error: 'Error',
     retry: 'Retry',
     sale: 'SALE',
+    ok: 'OK',
+    addedToFavorites: 'Added to favorites',
+    removedFromFavorites: 'Removed from favorites',
+    addedToWishlist: 'Added to list',
+    removedFromWishlist: 'Removed from list',
+    addedToCellar: 'Added to cellar',
+    noteSaved: 'Note saved',
+  },
+
+  wineTypes: {
+    Rouge: 'Red',
+    Blanc: 'White',
+    Rosé: 'Rosé',
+    Mousseux: 'Sparkling',
+  } as Record<string, string>,
+
+  notFound: {
+    title: 'Page not found',
+    backHome: 'Back to home',
   },
 
   wishlist: {
@@ -254,5 +278,40 @@ export const en: typeof fr = {
     addNote: 'Add a note',
     placeholder: 'Your impressions of this wine...',
     myRating: 'My rating',
+  },
+
+  onboarding: {
+    skip: 'Skip',
+    next: 'Next',
+    start: 'Get started',
+    slide1Title: 'Scan & find',
+    slide1Sub: 'Scan a barcode or label to find any wine instantly.',
+    slide2Title: 'Perfect pairings',
+    slide2Sub: 'Find the ideal wine for every dish with our suggestions.',
+    slide3Title: 'AI Sommelier',
+    slide3Sub: 'Ask your questions and get personalized advice.',
+  },
+
+  toast: {
+    favoriteAdded: '❤️ Added to favorites',
+    favoriteRemoved: 'Removed from favorites',
+    wishlistAdded: '🔖 Added to list',
+    wishlistRemoved: 'Removed from list',
+    cellarAdded: '🍷 Added to cellar',
+    noteSaved: '📝 Note saved',
+  },
+
+  filters: {
+    title: 'Filters',
+    type: 'Wine type',
+    priceRange: 'Price',
+    minPrice: 'Min',
+    maxPrice: 'Max',
+    options: 'Options',
+    onSale: 'On sale',
+    organic: 'Organic',
+    expertPick: 'Rating 90+',
+    apply: 'Apply',
+    reset: 'Reset',
   },
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '@/constants/theme';
+import { useTranslation } from '@/i18n';
 
 interface Props {
   icon?: string;
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export default function EmptyState({ icon = 'wine-outline', message, submessage, onRetry }: Props) {
+  const t = useTranslation();
+
   return (
     <View style={styles.container}>
       <Ionicons name={icon as any} size={64} color={COLORS.grayLight} />
@@ -18,7 +21,7 @@ export default function EmptyState({ icon = 'wine-outline', message, submessage,
       {submessage && <Text style={styles.sub}>{submessage}</Text>}
       {onRetry && (
         <Pressable onPress={onRetry} style={styles.retryBtn}>
-          <Text style={styles.retryText}>Réessayer</Text>
+          <Text style={styles.retryText}>{t.common.retry}</Text>
         </Pressable>
       )}
     </View>

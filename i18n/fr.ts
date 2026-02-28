@@ -18,6 +18,7 @@ export const fr = {
     promo: '🏷️ Promo',
     organic: '🌿 Bio',
     expertPick: '⭐ 90+',
+    filters: 'Filtres',
   },
 
   deals: {
@@ -124,6 +125,7 @@ export const fr = {
     version: 'Version',
     appName: 'SAQ Futé',
     appDescription: 'Trouvez les meilleurs vins au meilleur prix à la SAQ.',
+    appTagline: 'Buvez mieux, dépensez moins',
     madeIn: 'Fait avec ❤️ au Québec',
   },
 
@@ -190,6 +192,7 @@ export const fr = {
     permissionMsg: 'Pour scanner les codes-barres et étiquettes',
     grant: 'Autoriser',
     cancel: 'Annuler',
+    notInstalled: 'Caméra non disponible',
   },
 
   menuScan: {
@@ -202,6 +205,7 @@ export const fr = {
     searchWines: 'Chercher ces vins',
     noResults: 'Impossible de lire le menu',
     tryAgain: 'Réessayer',
+    notInstalled: 'Galerie non disponible',
   },
 
   map: {
@@ -216,6 +220,7 @@ export const fr = {
     countryCount: 'pays producteurs',
     tapToExplore: 'Touchez un pays coloré pour explorer ses vins',
     mapError: 'Impossible de charger la carte',
+    mapLoading: 'Chargement de la carte...',
     backToWorld: 'Monde',
     seeAllWines: 'Voir tous les vins',
     loadingRegions: 'Chargement des régions...',
@@ -237,6 +242,25 @@ export const fr = {
     error: 'Erreur',
     retry: 'Réessayer',
     sale: 'PROMO',
+    ok: 'OK',
+    addedToFavorites: 'Ajouté aux favoris',
+    removedFromFavorites: 'Retiré des favoris',
+    addedToWishlist: 'Ajouté à la liste',
+    removedFromWishlist: 'Retiré de la liste',
+    addedToCellar: 'Ajouté à la cave',
+    noteSaved: 'Note sauvegardée',
+  },
+
+  wineTypes: {
+    Rouge: 'Rouge',
+    Blanc: 'Blanc',
+    Rosé: 'Rosé',
+    Mousseux: 'Mousseux',
+  } as Record<string, string>,
+
+  notFound: {
+    title: 'Page non trouvée',
+    backHome: "Retour à l'accueil",
   },
 
   wishlist: {
@@ -252,5 +276,40 @@ export const fr = {
     addNote: 'Ajouter une note',
     placeholder: 'Vos impressions sur ce vin...',
     myRating: 'Ma note',
+  },
+
+  onboarding: {
+    skip: 'Passer',
+    next: 'Suivant',
+    start: 'Commencer',
+    slide1Title: 'Scannez & trouvez',
+    slide1Sub: 'Scannez un code-barres ou une étiquette pour trouver le vin en un instant.',
+    slide2Title: 'Accords parfaits',
+    slide2Sub: 'Trouvez le vin idéal pour chaque plat grâce à nos suggestions.',
+    slide3Title: 'Sommelier IA',
+    slide3Sub: 'Posez vos questions et recevez des conseils personnalisés.',
+  },
+
+  toast: {
+    favoriteAdded: '❤️ Ajouté aux favoris',
+    favoriteRemoved: 'Retiré des favoris',
+    wishlistAdded: '🔖 Ajouté à la liste',
+    wishlistRemoved: 'Retiré de la liste',
+    cellarAdded: '🍷 Ajouté à la cave',
+    noteSaved: '📝 Note sauvegardée',
+  },
+
+  filters: {
+    title: 'Filtres',
+    type: 'Type de vin',
+    priceRange: 'Prix',
+    minPrice: 'Min',
+    maxPrice: 'Max',
+    options: 'Options',
+    onSale: 'En promo',
+    organic: 'Bio',
+    expertPick: 'Note 90+',
+    apply: 'Appliquer',
+    reset: 'Réinitialiser',
   },
 };

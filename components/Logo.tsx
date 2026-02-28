@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Ellipse, Rect, G, Polygon } from 'react-native-svg';
 import { COLORS } from '@/constants/theme';
+import { useTranslation } from '@/i18n';
 
 interface Props {
   size?: number;
@@ -16,6 +17,7 @@ export default function Logo({
   color = COLORS.cream,
   accentColor = COLORS.gold,
 }: Props) {
+  const t = useTranslation();
   const scale = size / 100;
 
   return (
@@ -80,7 +82,7 @@ export default function Logo({
         <View style={styles.textContainer}>
           <Text style={[styles.title, { color, fontSize: 22 * scale }]}>SAQ Futé</Text>
           <Text style={[styles.subtitle, { color: accentColor, fontSize: 10 * scale }]}>
-            Buvez mieux, dépensez moins
+            {t.settings.appTagline}
           </Text>
         </View>
       )}

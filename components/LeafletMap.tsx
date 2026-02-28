@@ -23,6 +23,8 @@ interface LeafletMapProps {
     noRegions: string;
     wines: string;
     regions: string;
+    mapLoading: string;
+    mapError: string;
   };
 }
 
@@ -37,7 +39,7 @@ const COUNTRY_FLAGS: Record<string, string> = {
 function generateLeafletHTML(
   countryData: { geoName: string; saqName: string; count: number }[],
   wineLabel: string,
-  t: { backToWorld: string; seeAllWines: string; loadingRegions: string; noRegions: string; wines: string; regions: string },
+  t: { backToWorld: string; seeAllWines: string; loadingRegions: string; noRegions: string; wines: string; regions: string; mapLoading: string; mapError: string },
 ): string {
   const maxCount = Math.max(...countryData.map((c) => c.count), 1);
 
@@ -180,7 +182,7 @@ function generateLeafletHTML(
   </style>
 </head>
 <body>
-  <div id="loading">Chargement de la carte...</div>
+  <div id="loading">${t.mapLoading}</div>
   <div id="map"></div>
   <button id="back-btn" onclick="resetToWorld()">&larr; ${t.backToWorld}</button>
   <div id="region-overlay">
@@ -203,6 +205,7 @@ function generateLeafletHTML(
     var T_SEE_ALL = ${JSON.stringify(t.seeAllWines)};
     var T_WINES = ${JSON.stringify(t.wines)};
     var T_REGIONS = ${JSON.stringify(t.regions)};
+    var T_MAP_ERROR = ${JSON.stringify(t.mapError)};
 
     var countryLookup = {};
     WINE_COUNTRIES.forEach(function(c) { countryLookup[c.geoName] = c; });
@@ -399,7 +402,7 @@ function generateLeafletHTML(
         }).addTo(map);
       })
       .catch(function(err) {
-        document.getElementById('loading').textContent = 'Erreur de chargement';
+        document.getElementById('loading').textContent = T_MAP_ERROR;
       });
   <\/script>
 </body>
@@ -407,12 +410,14 @@ function generateLeafletHTML(
 }
 
 const DEFAULT_TRANSLATIONS = {
-  backToWorld: 'Monde',
-  seeAllWines: 'Voir tous les vins',
-  loadingRegions: 'Chargement des régions...',
-  noRegions: 'Aucune région trouvée',
-  wines: 'vins',
-  regions: 'régions',
+  backToWorld: 'World',
+  seeAllWines: 'See all wines',
+  loadingRegions: 'Loading regions...',
+  noRegions: 'No regions found',
+  wines: 'wines',
+  regions: 'regions',
+  mapLoading: 'Loading map...',
+  mapError: 'Map loading error',
 };
 
 export default function LeafletMap({
@@ -422,7 +427,7 @@ export default function LeafletMap({
   onRegionPress,
   onBackToWorld,
   regionData,
-  wineLabel = 'vins',
+  wineLabel = 'wines',
   translations,
 }: LeafletMapProps) {
   const onCountryZoomRef = useRef(onCountryZoom);
