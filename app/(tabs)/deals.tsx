@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
 import type { Wine } from '@/types/wine';
@@ -12,6 +13,7 @@ const BUDGETS = [15, 20, 25, 30, 50];
 
 export default function DealsScreen() {
   const t = useTranslation();
+  const router = useRouter();
   const [budget, setBudget] = useState<number>(25);
   const [coeurs, setCoeurs] = useState<Wine[]>([]);
   const [deals, setDeals] = useState<Wine[]>([]);
@@ -20,16 +22,25 @@ export default function DealsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const shuffle = <T,>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [coeurRes, dealsRes, promoRes] = await Promise.all([
-        saqApi.coeur({ limit: 10 }),
+        saqApi.coeur({ limit: 30 }),
         saqApi.deals({ budget, limit: 10 }),
         saqApi.search({ onlySale: true, limit: 10 }),
       ]);
-      setCoeurs(coeurRes.wines);
+      setCoeurs(shuffle(coeurRes.wines).slice(0, 10));
       setDeals(dealsRes.wines);
       setPromos(promoRes.wines);
     } catch (err) {
@@ -60,7 +71,12 @@ export default function DealsScreen() {
       {/* Coups de Cœur */}
       {coeurs.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t.deals.coupDeCoeur}</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t.deals.coupDeCoeur}</Text>
+            <Pressable onPress={() => router.push('/coups-de-coeur')} hitSlop={12}>
+              <Text style={styles.seeAll}>{t.deals.seeAll} ›</Text>
+            </Pressable>
+          </View>
           <FlatList
             horizontal
             data={coeurs}
@@ -74,7 +90,7 @@ export default function DealsScreen() {
 
       {/* Budget selector + Top Deals */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t.deals.topDeals} {budget}$</Text>
+        <Text style={[styles.sectionTitle, styles.sectionTitleStandalone]}>{t.deals.topDeals} {budget}$</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.budgetRow}>
           {BUDGETS.map((b) => (
             <Pressable key={b} onPress={() => setBudget(b)} style={[styles.budgetBtn, budget === b && styles.budgetBtnActive]}>
@@ -92,7 +108,7 @@ export default function DealsScreen() {
       {/* En promo */}
       {promos.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t.deals.onSale}</Text>
+          <Text style={[styles.sectionTitle, styles.sectionTitleStandalone]}>{t.deals.onSale}</Text>
           <FlatList
             horizontal
             data={promos}
@@ -125,7 +141,10 @@ const styles = StyleSheet.create({
   budgetText: { fontSize: 16, fontWeight: '600', color: COLORS.grayDark },
   budgetTextActive: { color: COLORS.white },
   section: { marginTop: SPACING.md },
-  sectionTitle: { fontSize: 20, fontWeight: '800', color: COLORS.black, paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
+  sectionTitle: { fontSize: 20, fontWeight: '800', color: COLORS.black },
+  seeAll: { fontSize: 14, fontWeight: '600', color: COLORS.burgundy },
+  sectionTitleStandalone: { paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
   horizontalList: { paddingHorizontal: SPACING.md },
   emptyText: { color: COLORS.gray, paddingHorizontal: SPACING.md, fontStyle: 'italic' },
 });

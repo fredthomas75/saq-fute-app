@@ -45,6 +45,7 @@ function StackNavigator() {
       <Stack.Screen name="menu-scan" options={{ title: t.menuScan.title }} />
       <Stack.Screen name="map" options={{ title: t.map.title }} />
       <Stack.Screen name="country-wines" options={{ title: t.map.wines }} />
+      <Stack.Screen name="coups-de-coeur" options={{ title: t.deals.coupDeCoeur }} />
       <Stack.Screen name="wishlist" options={{ title: t.wishlist.title }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </Stack>

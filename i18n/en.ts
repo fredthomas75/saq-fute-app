@@ -30,6 +30,7 @@ export const en: typeof fr = {
     topDeals: '🔥 Top Deals under',
     noDeal: 'No deals for this budget',
     onSale: '🏷️ On sale',
+    seeAll: 'See all',
   },
 
   pairing: {

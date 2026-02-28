@@ -28,6 +28,7 @@ export const fr = {
     topDeals: '🔥 Top Deals sous',
     noDeal: 'Aucun deal pour ce budget',
     onSale: '🏷️ En promo',
+    seeAll: 'Voir tout',
   },
 
   pairing: {
