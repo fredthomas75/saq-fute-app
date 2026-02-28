@@ -10,7 +10,7 @@ import WineCard from '@/components/WineCard';
 import DealsSkeleton from '@/components/DealsSkeleton';
 import EmptyState from '@/components/EmptyState';
 
-const BUDGETS = [15, 20, 25, 30, 50];
+const BUDGETS = [15, 20, 25, 30, 50] as const;
 const BUDGET_KEY = 'deals_budget';
 const CACHE_KEY = 'deals_cache';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -44,6 +44,20 @@ export default function DealsScreen() {
     return a;
   };
 
+  // Sort deals: prioritize wines in the "sweet spot" range
+  // e.g. for budget 25$, show 20-25$ wines first, then the rest
+  const sortByBudgetRange = (wines: Wine[], b: number): Wine[] => {
+    const idx = BUDGETS.indexOf(b as typeof BUDGETS[number]);
+    const floor = idx > 0 ? BUDGETS[idx - 1] : 0;
+    return [...wines].sort((wA, wB) => {
+      const inRangeA = wA.price > floor && wA.price <= b;
+      const inRangeB = wB.price > floor && wB.price <= b;
+      if (inRangeA && !inRangeB) return -1;
+      if (!inRangeA && inRangeB) return 1;
+      return wB.price - wA.price; // within same group, higher price first
+    });
+  };
+
   // Persist budget when changed
   const handleBudgetChange = useCallback((b: number) => {
     setBudget(b);
@@ -63,7 +77,7 @@ export default function DealsScreen() {
           const data: CacheData = JSON.parse(cached);
           if (Date.now() - data.timestamp < CACHE_TTL && data.budget === b) {
             setCoeurs(shuffle(data.coeurs).slice(0, 10));
-            setDeals(data.deals);
+            setDeals(sortByBudgetRange(data.deals, b));
             setPromos(data.promos);
             hasData.current = true;
             setLoading(false);
@@ -79,7 +93,7 @@ export default function DealsScreen() {
       ]);
 
       setCoeurs(shuffle(coeurRes.wines).slice(0, 10));
-      setDeals(dealsRes.wines);
+      setDeals(sortByBudgetRange(dealsRes.wines, b));
       setPromos(promoRes.wines);
       hasData.current = true;
 
