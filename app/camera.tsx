@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,25 +7,23 @@ import { saqApi } from '@/services/api';
 import { analyzeWineLabel } from '@/services/chat';
 import { useTranslation } from '@/i18n';
 
-let CameraView: any = null;
+let CameraViewComponent: any = null;
 let useCameraPermissions: any = null;
 try {
   const cam = require('expo-camera');
-  CameraView = cam.CameraView;
+  CameraViewComponent = cam.CameraView;
   useCameraPermissions = cam.useCameraPermissions;
 } catch {}
+
+// Barcode scanner settings — defined outside component to avoid re-creation
+const BARCODE_SETTINGS = { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'qr'] };
 
 export default function CameraScreen() {
   const t = useTranslation();
   const router = useRouter();
-  const cameraRef = useRef<any>(null);
-  const [mode, setMode] = useState<'barcode' | 'label'>('barcode');
-  const [scanned, setScanned] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
 
   // Graceful fallback if expo-camera not installed
-  if (!CameraView || !useCameraPermissions) {
+  if (!CameraViewComponent || !useCameraPermissions) {
     return (
       <View style={styles.fallback}>
         <Ionicons name="camera-outline" size={64} color={COLORS.gray} />
@@ -38,32 +36,27 @@ export default function CameraScreen() {
     );
   }
 
-  return <CameraContent />;
+  // Render the actual camera content — all state lives here
+  return <CameraContent router={router} t={t} />;
+}
 
-  function CameraContent() {
-    const [permission, requestPermission] = useCameraPermissions();
+// Separate stable component — won't be recreated on parent re-renders
+function CameraContent({ router, t }: { router: any; t: any }) {
+  const [permission, requestPermission] = useCameraPermissions!();
+  const cameraRef = useRef<any>(null);
+  const [mode, setMode] = useState<'barcode' | 'label'>('barcode');
+  const [scanned, setScanned] = useState(false);
+  const scannedRef = useRef(false); // Ref to avoid stale closure in callback
+  const [analyzing, setAnalyzing] = useState(false);
+  const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
 
-    if (!permission) return <ActivityIndicator style={{ flex: 1 }} color={COLORS.burgundy} />;
+  const handleBarcodeScan = useCallback(({ data }: { data: string }) => {
+    // Use ref to prevent duplicate scans (avoids stale closure with state)
+    if (scannedRef.current) return;
+    scannedRef.current = true;
+    setScanned(true);
 
-    if (!permission.granted) {
-      return (
-        <View style={styles.fallback}>
-          <Ionicons name="camera-outline" size={64} color={COLORS.burgundy} />
-          <Text style={styles.fallbackText}>{t.camera.permissionTitle}</Text>
-          <Text style={styles.fallbackSub}>{t.camera.permissionMsg}</Text>
-          <Pressable onPress={requestPermission} style={styles.grantBtn}>
-            <Text style={styles.grantBtnText}>{t.camera.grant}</Text>
-          </Pressable>
-          <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
-            <Text style={styles.cancelBtnText}>{t.camera.cancel}</Text>
-          </Pressable>
-        </View>
-      );
-    }
-
-    const handleBarcodeScan = async ({ data }: { data: string }) => {
-      if (scanned) return;
-      setScanned(true);
+    (async () => {
       try {
         // Try local DB first
         const result = await saqApi.search({ query: data, limit: 1 });
@@ -81,119 +74,150 @@ export default function CameraScreen() {
       } catch {
         setNotFoundQuery(data);
       }
-    };
+    })();
+  }, [router]);
 
-    const handleLabelCapture = async () => {
-      if (!cameraRef.current || analyzing) return;
-      setAnalyzing(true);
-      try {
-        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.6 });
-        const wineName = await analyzeWineLabel(photo.base64);
-        const result = await saqApi.search({ query: wineName.trim(), limit: 5 });
-        if (result.wines.length > 0) {
-          router.replace({ pathname: '/wine/[id]', params: { id: result.wines[0].id } });
-        } else {
-          setNotFoundQuery(wineName.trim());
-        }
-      } catch (e) {
-        setNotFoundQuery('');
+  const handleLabelCapture = useCallback(async () => {
+    if (!cameraRef.current || analyzing) return;
+    setAnalyzing(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.6 });
+      const wineName = await analyzeWineLabel(photo.base64);
+      const result = await saqApi.search({ query: wineName.trim(), limit: 5 });
+      if (result.wines.length > 0) {
+        router.replace({ pathname: '/wine/[id]', params: { id: result.wines[0].id } });
+      } else {
+        setNotFoundQuery(wineName.trim());
       }
-      setAnalyzing(false);
-    };
+    } catch (e) {
+      setNotFoundQuery('');
+    }
+    setAnalyzing(false);
+  }, [router, analyzing]);
 
-    const handleOpenSAQ = () => {
-      const query = encodeURIComponent(notFoundQuery || '');
-      const url = query
-        ? `https://www.saq.com/fr/catalogsearch/result/?q=${query}`
-        : 'https://www.saq.com';
-      Linking.openURL(url);
-    };
+  const handleOpenSAQ = useCallback(() => {
+    const query = encodeURIComponent(notFoundQuery || '');
+    const url = query
+      ? `https://www.saq.com/fr/catalogsearch/result/?q=${query}`
+      : 'https://www.saq.com';
+    Linking.openURL(url);
+  }, [notFoundQuery]);
 
-    const handleRetry = () => {
-      setNotFoundQuery(null);
-      setScanned(false);
-    };
+  const handleRetry = useCallback(() => {
+    setNotFoundQuery(null);
+    setScanned(false);
+    scannedRef.current = false;
+  }, []);
 
+  const switchToBarcode = useCallback(() => {
+    setMode('barcode');
+    setScanned(false);
+    scannedRef.current = false;
+  }, []);
+
+  const switchToLabel = useCallback(() => {
+    setMode('label');
+  }, []);
+
+  if (!permission) return <ActivityIndicator style={{ flex: 1 }} color={COLORS.burgundy} />;
+
+  if (!permission.granted) {
     return (
-      <View style={styles.container}>
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFillObject}
-          barcodeScannerSettings={
-            mode === 'barcode'
-              ? { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'] }
-              : undefined
-          }
-          onBarcodeScanned={mode === 'barcode' && !scanned ? handleBarcodeScan : undefined}
-        />
-
-        {/* Top bar */}
-        <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-          </Pressable>
-          <Text style={styles.title}>{t.camera.title}</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        {/* Viewfinder */}
-        <View style={styles.viewfinder}>
-          {analyzing && (
-            <View style={styles.analyzingOverlay}>
-              <ActivityIndicator size="large" color={COLORS.white} />
-              <Text style={styles.analyzingText}>{t.camera.analyzing}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Not found overlay */}
-        {notFoundQuery !== null && (
-          <View style={styles.notFoundOverlay}>
-            <Ionicons name="search-outline" size={40} color={COLORS.white} />
-            <Text style={styles.notFoundTitle}>{t.camera.notFound}</Text>
-            <Text style={styles.notFoundSub}>{t.camera.notFoundSub}</Text>
-            <Pressable onPress={handleOpenSAQ} style={styles.saqBtn}>
-              <Ionicons name="open-outline" size={18} color={COLORS.white} />
-              <Text style={styles.saqBtnText}>{t.camera.searchSAQ}</Text>
-            </Pressable>
-            <Pressable onPress={handleRetry} style={styles.retryBtn}>
-              <Text style={styles.retryBtnText}>{t.camera.retry}</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {/* Bottom controls */}
-        <View style={styles.bottom}>
-          {/* Mode toggle */}
-          <View style={styles.modeToggle}>
-            <Pressable
-              onPress={() => { setMode('barcode'); setScanned(false); }}
-              style={[styles.modeBtn, mode === 'barcode' && styles.modeBtnActive]}
-            >
-              <Ionicons name="barcode-outline" size={18} color={mode === 'barcode' ? COLORS.white : COLORS.grayDark} />
-              <Text style={[styles.modeText, mode === 'barcode' && styles.modeTextActive]}>{t.camera.barcode}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setMode('label')}
-              style={[styles.modeBtn, mode === 'label' && styles.modeBtnActive]}
-            >
-              <Ionicons name="image-outline" size={18} color={mode === 'label' ? COLORS.white : COLORS.grayDark} />
-              <Text style={[styles.modeText, mode === 'label' && styles.modeTextActive]}>{t.camera.label}</Text>
-            </Pressable>
-          </View>
-
-          {/* Hint or capture button */}
-          {mode === 'barcode' ? (
-            <Text style={styles.hint}>{t.camera.scanning}</Text>
-          ) : (
-            <Pressable onPress={handleLabelCapture} style={styles.captureBtn} disabled={analyzing}>
-              <View style={styles.captureInner} />
-            </Pressable>
-          )}
-        </View>
+      <View style={styles.fallback}>
+        <Ionicons name="camera-outline" size={64} color={COLORS.burgundy} />
+        <Text style={styles.fallbackText}>{t.camera.permissionTitle}</Text>
+        <Text style={styles.fallbackSub}>{t.camera.permissionMsg}</Text>
+        <Pressable onPress={requestPermission} style={styles.grantBtn}>
+          <Text style={styles.grantBtnText}>{t.camera.grant}</Text>
+        </Pressable>
+        <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
+          <Text style={styles.cancelBtnText}>{t.camera.cancel}</Text>
+        </Pressable>
       </View>
     );
   }
+
+  return (
+    <View style={styles.container}>
+      <CameraViewComponent
+        ref={cameraRef}
+        style={StyleSheet.absoluteFillObject}
+        facing="back"
+        barcodeScannerSettings={mode === 'barcode' ? BARCODE_SETTINGS : undefined}
+        onBarcodeScanned={mode === 'barcode' && !scanned ? handleBarcodeScan : undefined}
+      />
+
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+        </Pressable>
+        <Text style={styles.title}>{t.camera.title}</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      {/* Viewfinder */}
+      <View style={styles.viewfinder}>
+        {analyzing && (
+          <View style={styles.analyzingOverlay}>
+            <ActivityIndicator size="large" color={COLORS.white} />
+            <Text style={styles.analyzingText}>{t.camera.analyzing}</Text>
+          </View>
+        )}
+        {mode === 'barcode' && !scanned && !analyzing && (
+          <View style={styles.scanLineWrap}>
+            <View style={styles.scanLine} />
+          </View>
+        )}
+      </View>
+
+      {/* Not found overlay */}
+      {notFoundQuery !== null && (
+        <View style={styles.notFoundOverlay}>
+          <Ionicons name="search-outline" size={40} color={COLORS.white} />
+          <Text style={styles.notFoundTitle}>{t.camera.notFound}</Text>
+          <Text style={styles.notFoundSub}>{t.camera.notFoundSub}</Text>
+          <Pressable onPress={handleOpenSAQ} style={styles.saqBtn}>
+            <Ionicons name="open-outline" size={18} color={COLORS.white} />
+            <Text style={styles.saqBtnText}>{t.camera.searchSAQ}</Text>
+          </Pressable>
+          <Pressable onPress={handleRetry} style={styles.retryBtn}>
+            <Text style={styles.retryBtnText}>{t.camera.retry}</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Bottom controls */}
+      <View style={styles.bottom}>
+        {/* Mode toggle */}
+        <View style={styles.modeToggle}>
+          <Pressable
+            onPress={switchToBarcode}
+            style={[styles.modeBtn, mode === 'barcode' && styles.modeBtnActive]}
+          >
+            <Ionicons name="barcode-outline" size={18} color={mode === 'barcode' ? COLORS.white : COLORS.grayDark} />
+            <Text style={[styles.modeText, mode === 'barcode' && styles.modeTextActive]}>{t.camera.barcode}</Text>
+          </Pressable>
+          <Pressable
+            onPress={switchToLabel}
+            style={[styles.modeBtn, mode === 'label' && styles.modeBtnActive]}
+          >
+            <Ionicons name="image-outline" size={18} color={mode === 'label' ? COLORS.white : COLORS.grayDark} />
+            <Text style={[styles.modeText, mode === 'label' && styles.modeTextActive]}>{t.camera.label}</Text>
+          </Pressable>
+        </View>
+
+        {/* Hint or capture button */}
+        {mode === 'barcode' ? (
+          <Text style={styles.hint}>{t.camera.scanning}</Text>
+        ) : (
+          <Pressable onPress={handleLabelCapture} style={styles.captureBtn} disabled={analyzing}>
+            <View style={styles.captureInner} />
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -226,6 +250,22 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  scanLineWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanLine: {
+    width: '80%',
+    height: 2,
+    backgroundColor: COLORS.burgundy,
+    opacity: 0.8,
   },
   analyzingOverlay: { alignItems: 'center', gap: SPACING.sm },
   analyzingText: { color: COLORS.white, fontSize: 15, fontWeight: '600' },
