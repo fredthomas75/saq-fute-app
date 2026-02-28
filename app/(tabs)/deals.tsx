@@ -57,15 +57,6 @@ export default function DealsScreen() {
         />
       }
     >
-      {/* Budget selector */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.budgetRow}>
-        {BUDGETS.map((b) => (
-          <Pressable key={b} onPress={() => setBudget(b)} style={[styles.budgetBtn, budget === b && styles.budgetBtnActive]}>
-            <Text style={[styles.budgetText, budget === b && styles.budgetTextActive]}>{b}$</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
       {/* Coups de Cœur */}
       {coeurs.length > 0 && (
         <View style={styles.section}>
@@ -81,9 +72,16 @@ export default function DealsScreen() {
         </View>
       )}
 
-      {/* Top Deals */}
+      {/* Budget selector + Top Deals */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.deals.topDeals} {budget}$</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.budgetRow}>
+          {BUDGETS.map((b) => (
+            <Pressable key={b} onPress={() => setBudget(b)} style={[styles.budgetBtn, budget === b && styles.budgetBtnActive]}>
+              <Text style={[styles.budgetText, budget === b && styles.budgetTextActive]}>{b}$</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
         {deals.length === 0 ? (
           <Text style={styles.emptyText}>{t.deals.noDeal}</Text>
         ) : (
