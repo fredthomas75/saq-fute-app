@@ -48,7 +48,8 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: COLORS.burgundy },
         headerTintColor: COLORS.white,
         headerTitleStyle: { fontWeight: '700' },
-        headerTitle: () => <HeaderLogo />,
+        headerTitle: '',
+        headerLeft: () => <HeaderLogo />,
         headerRight: () => <HeaderRight />,
       }}
     >
@@ -95,22 +96,22 @@ const styles = StyleSheet.create({
   headerLogoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginLeft: SPACING.md,
+    gap: 8,
+    paddingLeft: SPACING.sm,
   },
   headerLogoText: {
     color: COLORS.cream,
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   headerRightRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    marginRight: SPACING.sm,
+    gap: 4,
+    paddingRight: SPACING.sm,
   },
   headerBtn: {
-    padding: 6,
+    padding: 8,
   },
 });
