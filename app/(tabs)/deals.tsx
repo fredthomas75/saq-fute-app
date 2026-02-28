@@ -1,15 +1,27 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
 import type { Wine } from '@/types/wine';
 import { useTranslation } from '@/i18n';
 import WineCard from '@/components/WineCard';
-import LoadingState from '@/components/LoadingState';
+import DealsSkeleton from '@/components/DealsSkeleton';
 import EmptyState from '@/components/EmptyState';
 
 const BUDGETS = [15, 20, 25, 30, 50];
+const BUDGET_KEY = 'deals_budget';
+const CACHE_KEY = 'deals_cache';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+interface CacheData {
+  coeurs: Wine[];
+  deals: Wine[];
+  promos: Wine[];
+  budget: number;
+  timestamp: number;
+}
 
 export default function DealsScreen() {
   const t = useTranslation();
@@ -21,6 +33,8 @@ export default function DealsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const budgetLoaded = useRef(false);
+  const hasData = useRef(false);
 
   const shuffle = <T,>(arr: T[]): T[] => {
     const a = [...arr];
@@ -31,29 +45,86 @@ export default function DealsScreen() {
     return a;
   };
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
+  // Load persisted budget on mount
+  useEffect(() => {
+    AsyncStorage.getItem(BUDGET_KEY).then((val) => {
+      if (val) setBudget(Number(val));
+      budgetLoaded.current = true;
+    }).catch(() => {
+      budgetLoaded.current = true;
+    });
+  }, []);
+
+  // Persist budget when changed
+  const handleBudgetChange = useCallback((b: number) => {
+    setBudget(b);
+    AsyncStorage.setItem(BUDGET_KEY, String(b)).catch(() => {});
+  }, []);
+
+  const fetchAll = useCallback(async (isRefresh = false) => {
+    if (!isRefresh && hasData.current) return; // Skip if data already loaded (cache)
+    if (!isRefresh) setLoading(true);
     setError(null);
     try {
+      // Try cache first (not on refresh)
+      if (!isRefresh) {
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const data: CacheData = JSON.parse(cached);
+          if (Date.now() - data.timestamp < CACHE_TTL && data.budget === budget) {
+            setCoeurs(shuffle(data.coeurs).slice(0, 10));
+            setDeals(data.deals);
+            setPromos(data.promos);
+            hasData.current = true;
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const [coeurRes, dealsRes, promoRes] = await Promise.all([
         saqApi.coeur({ limit: 30 }),
         saqApi.deals({ budget, limit: 10 }),
         saqApi.search({ onlySale: true, limit: 10 }),
       ]);
+
       setCoeurs(shuffle(coeurRes.wines).slice(0, 10));
       setDeals(dealsRes.wines);
       setPromos(promoRes.wines);
+      hasData.current = true;
+
+      // Save to cache
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+        coeurs: coeurRes.wines,
+        deals: dealsRes.wines,
+        promos: promoRes.wines,
+        budget,
+        timestamp: Date.now(),
+      } as CacheData)).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [budget, t]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  // Refetch when budget changes (but only after initial load)
+  useEffect(() => {
+    if (!budgetLoaded.current) return;
+    hasData.current = false; // Force refetch on budget change
+    fetchAll();
+  }, [fetchAll]);
 
-  if (loading) return <LoadingState message={t.deals.loading} />;
-  if (error) return <EmptyState icon="cloud-offline-outline" message={t.deals.error} submessage={error} onRetry={fetchAll} />;
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    hasData.current = false;
+    await fetchAll(true);
+  }, [fetchAll]);
+
+  // Only show full-screen skeleton on first load (no data yet)
+  if (loading && !hasData.current) return <DealsSkeleton />;
+  if (error && !hasData.current) return <EmptyState icon="cloud-offline-outline" message={t.deals.error} submessage={error} onRetry={() => { hasData.current = false; fetchAll(); }} />;
 
   return (
     <ScrollView
@@ -62,7 +133,7 @@ export default function DealsScreen() {
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
-          onRefresh={async () => { setRefreshing(true); await fetchAll(); setRefreshing(false); }}
+          onRefresh={handleRefresh}
           tintColor={COLORS.burgundy}
           colors={[COLORS.burgundy]}
         />
@@ -93,7 +164,7 @@ export default function DealsScreen() {
         <Text style={[styles.sectionTitle, styles.sectionTitleStandalone]}>{t.deals.topDeals} {budget}$</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.budgetRow}>
           {BUDGETS.map((b) => (
-            <Pressable key={b} onPress={() => setBudget(b)} style={[styles.budgetBtn, budget === b && styles.budgetBtnActive]}>
+            <Pressable key={b} onPress={() => handleBudgetChange(b)} style={[styles.budgetBtn, budget === b && styles.budgetBtnActive]}>
               <Text style={[styles.budgetText, budget === b && styles.budgetTextActive]}>{b}$</Text>
             </Pressable>
           ))}
@@ -108,7 +179,12 @@ export default function DealsScreen() {
       {/* En promo */}
       {promos.length > 0 && (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, styles.sectionTitleStandalone]}>{t.deals.onSale}</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t.deals.onSale}</Text>
+            <Pressable onPress={() => router.push('/en-promo')} hitSlop={12}>
+              <Text style={styles.seeAll}>{t.deals.seeAll} ›</Text>
+            </Pressable>
+          </View>
           <FlatList
             horizontal
             data={promos}
