@@ -19,7 +19,6 @@ export default function QuizScreen() {
   const t = useTranslation();
   const router = useRouter();
   const { saveProfile } = useTasteProfile();
-  const dishLabels = t.pairing.dishes as Record<string, string>;
 
   const [step, setStep] = useState(0);
   const [types, setTypes] = useState<string[]>([]);
@@ -27,6 +26,7 @@ export default function QuizScreen() {
   const [body, setBody] = useState<TasteProfile['body']>('medium');
   const [budget, setBudget] = useState(30);
   const [foods, setFoods] = useState<string[]>([]);
+  const [saved, setSaved] = useState(false);
 
   const toggleType = (type: string) => {
     setTypes((prev) => prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]);
@@ -45,12 +45,70 @@ export default function QuizScreen() {
       foodPreferences: foods,
       completed: true,
     });
-    router.back();
+    setSaved(true);
   };
 
   const canNext = step === 0 ? types.length > 0 : true;
+  const dishLabels = t.pairing.dishes as Record<string, string>;
+
+  const sweetLabels: Record<string, string> = { dry: t.quiz.dry, 'off-dry': t.quiz.offDry, sweet: t.quiz.sweet };
+  const bodyLabels: Record<string, string> = { light: t.quiz.light, medium: t.quiz.medium, full: t.quiz.full };
 
   const questions = [t.quiz.q1, t.quiz.q2, t.quiz.q3, t.quiz.q4, t.quiz.q5];
+
+  // Saved profile confirmation
+  if (saved) {
+    const selectedTypes = (types.length > 0 ? types : ['Rouge']).map(t2 => `${TYPE_EMOJIS[t2] || ''} ${t.wineTypes[t2] || t2}`).join(', ');
+    const selectedFoods = foods.map(f => `${FOOD_EMOJIS[f] || ''} ${dishLabels[f] || f}`).join(', ');
+
+    return (
+      <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.savedContent}>
+          <Ionicons name="checkmark-circle" size={64} color={COLORS.burgundy} />
+          <Text style={styles.savedTitle}>{t.quiz.profileSaved}</Text>
+          <Text style={styles.savedSub}>{t.quiz.profileSavedSub}</Text>
+
+          <View style={styles.profileCard}>
+            <Text style={styles.profileHeading}>{t.quiz.myProfile}</Text>
+
+            <View style={styles.profileRow}>
+              <Text style={styles.profileLabel}>{t.quiz.q1}</Text>
+              <Text style={styles.profileValue}>{selectedTypes}</Text>
+            </View>
+
+            <View style={styles.profileRow}>
+              <Text style={styles.profileLabel}>{t.quiz.q2}</Text>
+              <Text style={styles.profileValue}>{sweetLabels[sweetness] || sweetness}</Text>
+            </View>
+
+            <View style={styles.profileRow}>
+              <Text style={styles.profileLabel}>{t.quiz.q3}</Text>
+              <Text style={styles.profileValue}>{bodyLabels[body] || body}</Text>
+            </View>
+
+            <View style={styles.profileRow}>
+              <Text style={styles.profileLabel}>{t.quiz.q4}</Text>
+              <Text style={styles.profileValue}>{budget}$</Text>
+            </View>
+
+            {selectedFoods ? (
+              <View style={styles.profileRow}>
+                <Text style={styles.profileLabel}>{t.quiz.q5}</Text>
+                <Text style={styles.profileValue}>{selectedFoods}</Text>
+              </View>
+            ) : null}
+          </View>
+        </ScrollView>
+
+        <View style={styles.nav}>
+          <Pressable onPress={() => router.back()} style={styles.navBtn}>
+            <Ionicons name="home-outline" size={18} color={COLORS.white} />
+            <Text style={styles.navText}>{t.common.back}</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -258,4 +316,52 @@ const styles = StyleSheet.create({
   },
   navText: { fontSize: 16, fontWeight: '700', color: COLORS.white },
   navTextSecondary: { fontSize: 16, fontWeight: '600', color: COLORS.burgundy },
+  savedContent: {
+    flex: 1,
+    alignItems: 'center',
+    padding: SPACING.xl,
+    paddingTop: 60,
+    gap: SPACING.md,
+  },
+  savedTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: COLORS.burgundy,
+    marginTop: SPACING.sm,
+  },
+  savedSub: {
+    fontSize: 15,
+    color: COLORS.gray,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  profileCard: {
+    width: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    gap: SPACING.md,
+    ...SHADOWS.card,
+  },
+  profileHeading: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.black,
+    marginBottom: SPACING.xs,
+  },
+  profileRow: {
+    gap: 4,
+  },
+  profileLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.gray,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  profileValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.grayDark,
+  },
 });
