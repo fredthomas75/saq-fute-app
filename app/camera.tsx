@@ -249,7 +249,8 @@ function CameraContent({ router, t }: { router: any; t: any }) {
 
     const hasBarcodeDetector = typeof (window as any).BarcodeDetector !== 'undefined';
     if (!hasBarcodeDetector) {
-      // No BarcodeDetector — user will use capture button or manual entry
+      // No BarcodeDetector (Safari/iOS) — show manual entry immediately
+      setShowManualInput(true);
       return;
     }
 
@@ -353,12 +354,18 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       }
       setScanStatus(t.camera.identifyingWine);
       const wineName = await analyzeWineLabel(base64Data);
-      setDetectedLabel(wineName.trim());
+      const cleaned = cleanWineName(wineName);
+      setDetectedLabel(cleaned);
       setScanStatus('');
 
-      const found = await searchWineByName(wineName);
+      const found = await searchWineByName(cleaned);
       if (!found) {
-        setNotFoundQuery(wineName.trim());
+        // Auto-redirect to SAQ.com search instead of dead-end "not found"
+        setAnalyzing(false);
+        setScanStatus('');
+        const query = encodeURIComponent(cleaned);
+        Linking.openURL(`https://www.saq.com/fr/catalogsearch/result/?q=${query}`);
+        return;
       }
     } catch (err) {
       console.warn('Label capture error:', err);
@@ -567,18 +574,12 @@ function CameraContent({ router, t }: { router: any; t: any }) {
               </Pressable>
             )}
 
-            {/* Web: capture + AI barcode reading (works on all browsers) */}
-            {isWeb && (
-              <Pressable onPress={handleWebBarcodeCapture} style={styles.scanActionBtn} disabled={analyzing}>
-                {analyzing ? (
-                  <ActivityIndicator size="small" color={COLORS.white} />
-                ) : (
-                  <Ionicons name="scan" size={28} color={COLORS.white} />
-                )}
-                <Text style={styles.scanActionText}>
-                  {analyzing ? t.camera.analyzing : t.camera.barcode}
-                </Text>
-              </Pressable>
+            {/* Web with BarcodeDetector: show status (scanning happens automatically) */}
+            {isWeb && typeof (globalThis as any).BarcodeDetector !== 'undefined' && (
+              <View style={styles.scanActionBtn}>
+                <ActivityIndicator size="small" color={COLORS.white} />
+                <Text style={styles.scanActionText}>{t.camera.scanning}</Text>
+              </View>
             )}
 
             {/* Manual entry — always available */}
