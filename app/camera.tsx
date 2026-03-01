@@ -74,6 +74,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   const hasLaunchedScanner = useRef(false);
   const webScanIntervalRef = useRef<any>(null);
   const webScanTimeoutRef = useRef<any>(null);
+  const lastCapturedImageRef = useRef<string | null>(null);
 
   // Clean wine name from AI response
   const cleanWineName = (raw: string): string => {
@@ -262,6 +263,28 @@ function CameraContent({ router, t }: { router: any; t: any }) {
           return;
         }
 
+        // Strategy 4: If we have a captured image, try wine label analysis as last resort
+        if (lastCapturedImageRef.current) {
+          try {
+            setScanStatus(t.camera.identifyingWine);
+            const wineName = await analyzeWineLabel(lastCapturedImageRef.current);
+            lastCapturedImageRef.current = null;
+            const cleaned = cleanWineName(wineName);
+            if (cleaned.length > 2) {
+              setDetectedLabel(cleaned);
+              const found = await searchWineByName(cleaned);
+              if (found) return;
+              // Label identified but not in SAQ → redirect to SAQ.com search
+              setScanStatus('');
+              const q = encodeURIComponent(cleaned);
+              Linking.openURL(`https://www.saq.com/fr/catalogsearch/result/?q=${q}`);
+              return;
+            }
+          } catch {
+            // Label analysis failed, fall through to not found
+          }
+        }
+
         setNotFoundQuery(data);
       } catch {
         setNotFoundQuery(data);
@@ -285,11 +308,32 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       setScanStatus(t.camera.analyzing);
       const code = await readBarcodeFromImage(base64Data);
       if (code) {
+        // Store image so processBarcode can fall back to label analysis
+        lastCapturedImageRef.current = base64Data;
         setAnalyzing(false);
         processBarcode(code);
         return;
       }
-      // No barcode found by vision — offer manual entry
+      // No barcode found — try label analysis on the same image
+      setScanStatus(t.camera.identifyingWine);
+      try {
+        const wineName = await analyzeWineLabel(base64Data);
+        const cleaned = cleanWineName(wineName);
+        if (cleaned.length > 2) {
+          setDetectedLabel(cleaned);
+          setAnalyzing(false);
+          const found = await searchWineByName(cleaned);
+          if (found) return;
+          // Label identified but not in SAQ → redirect
+          setScanStatus('');
+          const q = encodeURIComponent(cleaned);
+          Linking.openURL(`https://www.saq.com/fr/catalogsearch/result/?q=${q}`);
+          return;
+        }
+      } catch {
+        // Label analysis also failed
+      }
+      // Nothing worked — offer manual entry
       setAnalyzing(false);
       setScanStatus('');
       setShowManualInput(true);
