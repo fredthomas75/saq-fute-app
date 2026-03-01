@@ -58,13 +58,6 @@ export default function DealsScreen() {
     return [...sweetSpot, ...rest].slice(0, 10);
   };
 
-  // Persist budget when changed
-  const handleBudgetChange = useCallback((b: number) => {
-    setBudget(b);
-    hasData.current = false;
-    AsyncStorage.setItem(BUDGET_KEY, String(b)).catch(() => {});
-  }, []);
-
   const doFetch = useCallback(async (b: number, isRefresh = false) => {
     if (!isRefresh && hasData.current) return;
     if (!isRefresh) setLoading(true);
@@ -119,6 +112,14 @@ export default function DealsScreen() {
     }
   }, [t]);
 
+  // Persist budget when changed — immediately fetch for new budget
+  const handleBudgetChange = useCallback((b: number) => {
+    setBudget(b);
+    hasData.current = false;
+    AsyncStorage.setItem(BUDGET_KEY, String(b)).catch(() => {});
+    doFetch(b);
+  }, [doFetch]);
+
   // Load persisted budget then fetch
   useEffect(() => {
     AsyncStorage.getItem(BUDGET_KEY).then((val) => {
@@ -129,12 +130,6 @@ export default function DealsScreen() {
       doFetch(25);
     });
   }, [doFetch]);
-
-  // Refetch when budget changes via user tap
-  useEffect(() => {
-    if (!hasData.current) return; // Skip initial mount
-    doFetch(budget);
-  }, [budget, doFetch]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
