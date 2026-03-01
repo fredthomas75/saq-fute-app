@@ -216,6 +216,7 @@ export const en: typeof fr = {
     searchingSAQ: 'Searching on SAQ.com...',
     searchingShort: 'Searching:',
     codeDetected: 'Code:',
+    identifyingProduct: 'Identifying product...',
   },
 
   menuScan: {

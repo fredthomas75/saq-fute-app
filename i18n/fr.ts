@@ -214,6 +214,7 @@ export const fr = {
     searchingSAQ: 'Recherche sur SAQ.com...',
     searchingShort: 'Recherche:',
     codeDetected: 'Code:',
+    identifyingProduct: 'Identification du produit...',
   },
 
   menuScan: {

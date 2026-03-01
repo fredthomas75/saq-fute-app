@@ -73,6 +73,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   const modernListenerRef = useRef<any>(null);
   const hasLaunchedScanner = useRef(false);
   const webScanIntervalRef = useRef<any>(null);
+  const webScanTimeoutRef = useRef<any>(null);
 
   // Clean wine name from AI response
   const cleanWineName = (raw: string): string => {
@@ -92,6 +93,23 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     // Remove trailing descriptors after comma (e.g. "Mouton Cadet, Bordeaux 2022")
     name = name.replace(/,\s*(Bordeaux|Bourgogne|Rioja|Toscane|Napa|Barossa|Mendoza|Valle|Vallée|AOC|AOP|DOC|DOCG|IGP|Vin de|Wine from).*$/i, '');
     return name.trim();
+  };
+
+  // Try to resolve barcode via Open Food Facts API
+  const lookupBarcodeExternal = async (barcode: string): Promise<string | null> => {
+    try {
+      const resp = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      if (data.status === 1 && data.product) {
+        return data.product.product_name || data.product.generic_name || null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   };
 
   // Try to search and navigate to a wine result
@@ -130,16 +148,30 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   const searchWineByName = useCallback(async (rawName: string): Promise<boolean> => {
     const name = cleanWineName(rawName);
     const nameNoYear = name.replace(/\b(19|20)\d{2}\b/g, '').trim();
-    const words = name.split(/\s+/).filter(w => w.length > 1);
+    const nameNoHyphens = name.replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+    const words = name.split(/[\s-]+/).filter(w => w.length > 1);
+    // Remove common French articles/prepositions for keyword searches
+    const significantWords = words.filter(w => !['de', 'du', 'des', 'le', 'la', 'les', 'un', 'une', 'et', 'en', 'au', 'aux', 'the', 'of', 'and'].includes(w.toLowerCase()));
 
     // Strategy 1: full cleaned name in local DB
     setScanStatus(`${t.camera.searchingShort} ${name}...`);
     if (await trySearch(name)) return true;
 
+    // Strategy 1b: name with hyphens replaced by spaces
+    if (nameNoHyphens !== name) {
+      if (await trySearch(nameNoHyphens)) return true;
+    }
+
     // Strategy 2: name without year
     if (nameNoYear !== name && nameNoYear.length > 2) {
       setScanStatus(`${t.camera.searchingShort} ${nameNoYear}...`);
       if (await trySearch(nameNoYear)) return true;
+    }
+
+    // Strategy 2b: significant words only (no articles/prepositions)
+    if (significantWords.length >= 2 && significantWords.length < words.length) {
+      const sigQuery = significantWords.join(' ');
+      if (await trySearch(sigQuery)) return true;
     }
 
     // Strategy 3: browse SAQ.com with full name
@@ -151,17 +183,22 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       if (await tryBrowse(nameNoYear)) return true;
     }
 
-    // Strategy 5: first 2 words only
-    if (words.length > 2) {
-      const short2 = words.slice(0, 2).join(' ');
+    // Strategy 4b: browse with hyphens as spaces
+    if (nameNoHyphens !== name) {
+      if (await tryBrowse(nameNoHyphens)) return true;
+    }
+
+    // Strategy 5: first 2 significant words only
+    if (significantWords.length > 2) {
+      const short2 = significantWords.slice(0, 2).join(' ');
       setScanStatus(`${t.camera.searchingShort} ${short2}...`);
       if (await trySearch(short2)) return true;
       if (await tryBrowse(short2)) return true;
     }
 
-    // Strategy 6: first 3 words
-    if (words.length > 3) {
-      const short3 = words.slice(0, 3).join(' ');
+    // Strategy 6: first 3 significant words
+    if (significantWords.length > 3) {
+      const short3 = significantWords.slice(0, 3).join(' ');
       setScanStatus(`${t.camera.searchingShort} ${short3}...`);
       if (await trySearch(short3)) return true;
     }
@@ -174,10 +211,14 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     if (scannedRef.current) return;
     scannedRef.current = true;
     setScanned(true);
-    // Stop web continuous scan
+    // Stop web continuous scan + timeout
     if (webScanIntervalRef.current) {
       clearInterval(webScanIntervalRef.current);
       webScanIntervalRef.current = null;
+    }
+    if (webScanTimeoutRef.current) {
+      clearTimeout(webScanTimeoutRef.current);
+      webScanTimeoutRef.current = null;
     }
     try { Haptics?.impactAsync?.(Haptics.ImpactFeedbackStyle?.Medium); } catch {}
     try { CameraViewComponent?.dismissScanner?.(); } catch {}
@@ -205,6 +246,22 @@ function CameraContent({ router, t }: { router: any; t: any }) {
             return;
           }
         }
+
+        // Strategy 3: Resolve EAN barcode via Open Food Facts → get wine name → search SAQ
+        setScanStatus(t.camera.identifyingProduct);
+        const productName = await lookupBarcodeExternal(data);
+        if (productName) {
+          const cleaned = cleanWineName(productName);
+          setDetectedLabel(cleaned);
+          const found = await searchWineByName(cleaned);
+          if (found) return;
+          // Name found but not in SAQ → redirect to SAQ.com search
+          setScanStatus('');
+          const q = encodeURIComponent(cleaned);
+          Linking.openURL(`https://www.saq.com/fr/catalogsearch/result/?q=${q}`);
+          return;
+        }
+
         setNotFoundQuery(data);
       } catch {
         setNotFoundQuery(data);
@@ -212,7 +269,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         setScanStatus('');
       }
     })();
-  }, [router]);
+  }, [router, searchWineByName, t]);
 
   // Web: capture photo and read barcode via vision API (fallback for browsers without BarcodeDetector)
   const handleWebBarcodeCapture = useCallback(async () => {
@@ -273,12 +330,26 @@ function CameraContent({ router, t }: { router: any; t: any }) {
           if (!video || video.readyState < 2) return; // Not ready yet
           const results = await detector.detect(video);
           if (results.length > 0 && results[0].rawValue) {
+            if (webScanTimeoutRef.current) {
+              clearTimeout(webScanTimeoutRef.current);
+              webScanTimeoutRef.current = null;
+            }
             processBarcode(results[0].rawValue);
           }
         } catch {
           // Ignore frame errors, keep scanning
         }
       }, 600);
+
+      // Auto-timeout after 10s → fall back to manual entry
+      webScanTimeoutRef.current = setTimeout(() => {
+        if (webScanIntervalRef.current && !scannedRef.current) {
+          clearInterval(webScanIntervalRef.current);
+          webScanIntervalRef.current = null;
+          setScanStatus('');
+          setShowManualInput(true);
+        }
+      }, 10000);
     } catch {
       setScanStatus(t.camera.webScanError);
     }
@@ -289,6 +360,10 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     if (webScanIntervalRef.current) {
       clearInterval(webScanIntervalRef.current);
       webScanIntervalRef.current = null;
+    }
+    if (webScanTimeoutRef.current) {
+      clearTimeout(webScanTimeoutRef.current);
+      webScanTimeoutRef.current = null;
     }
   }, []);
 
