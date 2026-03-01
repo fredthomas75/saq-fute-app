@@ -224,6 +224,7 @@ export const fr = {
     grant: 'Autoriser',
     cancel: 'Annuler',
     notInstalled: 'Caméra non disponible',
+    openScanner: 'Ouvrir le scanner',
   },
 
   menuScan: {

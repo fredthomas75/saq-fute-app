@@ -226,6 +226,7 @@ export const en: typeof fr = {
     grant: 'Grant',
     cancel: 'Cancel',
     notInstalled: 'Camera not available',
+    openScanner: 'Open scanner',
   },
 
   menuScan: {

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -12,14 +12,16 @@ try { Haptics = require('expo-haptics'); } catch {}
 
 let CameraViewComponent: any = null;
 let useCameraPermissions: any = null;
+let isModernScannerAvailable = false;
 try {
   const cam = require('expo-camera');
   CameraViewComponent = cam.CameraView;
   useCameraPermissions = cam.useCameraPermissions;
+  isModernScannerAvailable = CameraViewComponent?.isModernBarcodeScannerAvailable ?? false;
 } catch {}
 
 // Barcode scanner settings — defined outside component to avoid re-creation
-const BARCODE_SETTINGS = { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'qr'] };
+const BARCODE_SETTINGS = { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'qr'] as const };
 
 export default function CameraScreen() {
   const t = useTranslation();
@@ -52,17 +54,21 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   const scannedRef = useRef(false); // Ref to avoid stale closure in callback
   const [analyzing, setAnalyzing] = useState(false);
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
-
   const [scanStatus, setScanStatus] = useState<string>('');
+  const [cameraReady, setCameraReady] = useState(false);
+  const modernListenerRef = useRef<any>(null);
 
-  const handleBarcodeScan = useCallback(({ data, type }: { data: string; type?: string }) => {
-    // Use ref to prevent duplicate scans (avoids stale closure with state)
+  // Process a scanned barcode (shared between old and modern scanner)
+  const processBarcode = useCallback((data: string) => {
     if (scannedRef.current) return;
     scannedRef.current = true;
     setScanned(true);
 
     // Haptic feedback on scan
     try { Haptics?.impactAsync?.(Haptics.ImpactFeedbackStyle?.Medium); } catch {}
+
+    // Dismiss modern scanner if it was used
+    try { CameraViewComponent?.dismissScanner?.(); } catch {}
 
     setScanStatus(`Code détecté: ${data}`);
 
@@ -84,7 +90,6 @@ function CameraContent({ router, t }: { router: any; t: any }) {
             router.replace({ pathname: '/wine/[id]', params: { id: wine.id } });
             return;
           }
-          // If no ID but has a SAQ URL, open it
           if (wine.saqUrl) {
             Linking.openURL(wine.saqUrl);
             return;
@@ -96,6 +101,43 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       }
     })();
   }, [router]);
+
+  // Old API: onBarcodeScanned callback for CameraView prop
+  const handleBarcodeScan = useCallback(({ data }: { data: string; type?: string }) => {
+    processBarcode(data);
+  }, [processBarcode]);
+
+  // Modern scanner: register listener for onModernBarcodeScanned
+  useEffect(() => {
+    if (!isModernScannerAvailable || !CameraViewComponent?.onModernBarcodeScanned) return;
+
+    const subscription = CameraViewComponent.onModernBarcodeScanned((event: { data: string; type?: string }) => {
+      if (event.data) {
+        processBarcode(event.data);
+      }
+    });
+
+    modernListenerRef.current = subscription;
+    return () => {
+      subscription?.remove?.();
+      modernListenerRef.current = null;
+    };
+  }, [processBarcode]);
+
+  // Launch modern barcode scanner (native UI)
+  const launchModernScanner = useCallback(async () => {
+    if (!isModernScannerAvailable || !CameraViewComponent?.launchScanner) return;
+    try {
+      await CameraViewComponent.launchScanner({
+        barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'qr'],
+        isPinchToZoomEnabled: true,
+        isGuidanceEnabled: true,
+        isHighlightingEnabled: true,
+      });
+    } catch {
+      // Scanner dismissed or error — ignore
+    }
+  }, []);
 
   const handleLabelCapture = useCallback(async () => {
     if (!cameraRef.current || analyzing) return;
@@ -109,7 +151,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       } else {
         setNotFoundQuery(wineName.trim());
       }
-    } catch (e) {
+    } catch {
       setNotFoundQuery('');
     }
     setAnalyzing(false);
@@ -134,10 +176,23 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     setMode('barcode');
     setScanned(false);
     scannedRef.current = false;
+    setScanStatus('');
   }, []);
 
   const switchToLabel = useCallback(() => {
     setMode('label');
+    setScanStatus('');
+  }, []);
+
+  const onCameraReady = useCallback(() => {
+    setCameraReady(true);
+  }, []);
+
+  // Cleanup modern scanner on unmount
+  useEffect(() => {
+    return () => {
+      try { CameraViewComponent?.dismissScanner?.(); } catch {}
+    };
   }, []);
 
   if (!permission) return <ActivityIndicator style={{ flex: 1 }} color={COLORS.burgundy} />;
@@ -166,6 +221,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         facing="back"
         barcodeScannerSettings={mode === 'barcode' ? BARCODE_SETTINGS : undefined}
         onBarcodeScanned={mode === 'barcode' && !scanned ? handleBarcodeScan : undefined}
+        onCameraReady={onCameraReady}
       />
 
       {/* Top bar */}
@@ -235,9 +291,18 @@ function CameraContent({ router, t }: { router: any; t: any }) {
           </Pressable>
         </View>
 
-        {/* Hint or capture button */}
+        {/* Hint / capture / scan button */}
         {mode === 'barcode' ? (
-          <Text style={styles.hint}>{t.camera.scanning}</Text>
+          <View style={styles.barcodeControls}>
+            <Text style={styles.hint}>{t.camera.scanning}</Text>
+            {/* Modern scanner button — more reliable fallback */}
+            {isModernScannerAvailable && Platform.OS !== 'web' && (
+              <Pressable onPress={launchModernScanner} style={styles.modernScanBtn}>
+                <Ionicons name="scan-outline" size={22} color={COLORS.white} />
+                <Text style={styles.modernScanText}>{t.camera.openScanner || 'Ouvrir le scanner'}</Text>
+              </Pressable>
+            )}
+          </View>
         ) : (
           <Pressable onPress={handleLabelCapture} style={styles.captureBtn} disabled={analyzing}>
             <View style={styles.captureInner} />
@@ -342,6 +407,24 @@ const styles = StyleSheet.create({
   modeText: { fontSize: 14, fontWeight: '600', color: COLORS.grayDark },
   modeTextActive: { color: COLORS.white },
   hint: { color: COLORS.white + 'AA', fontSize: 14 },
+  barcodeControls: {
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  modernScanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.burgundy,
+    borderRadius: RADIUS.full,
+  },
+  modernScanText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '700',
+  },
   captureBtn: {
     width: 72,
     height: 72,
