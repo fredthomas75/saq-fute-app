@@ -32,9 +32,10 @@ export default function DealsScreen() {
   const [deals, setDeals] = useState<Wine[]>([]);
   const [promos, setPromos] = useState<Wine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dealsLoading, setDealsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasData = useRef(false);
+  const initialLoaded = useRef(false);
 
   const shuffle = <T,>(arr: T[]): T[] => {
     const a = [...arr];
@@ -52,38 +53,41 @@ export default function DealsScreen() {
   };
 
   // Merge sweet-spot wines with deals: sweet-spot first, then remaining deals (deduped)
-  const mergeDeals = (sweetSpot: Wine[], deals: Wine[]): Wine[] => {
+  const mergeDeals = (sweetSpot: Wine[], rawDeals: Wine[]): Wine[] => {
     const seen = new Set(sweetSpot.map(w => w.id));
-    const rest = deals.filter(w => !seen.has(w.id));
+    const rest = rawDeals.filter(w => !seen.has(w.id));
     return [...sweetSpot, ...rest].slice(0, 10);
   };
 
+  // Fetch ONLY deals for a given budget (used on budget change)
+  const fetchDealsOnly = useCallback(async (b: number) => {
+    setDealsLoading(true);
+    try {
+      const floor = getFloor(b);
+      const [dealsRes, sweetRes] = await Promise.all([
+        saqApi.deals({ budget: b, limit: 10 }),
+        floor > 0
+          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5 })
+          : Promise.resolve({ wines: [] as Wine[] } as any),
+      ]);
+      setDeals(mergeDeals(sweetRes.wines || [], dealsRes.wines));
+    } catch (err) {
+      // Keep existing deals on error, just log
+      console.warn('Failed to fetch deals for budget', b, err);
+    } finally {
+      setDealsLoading(false);
+    }
+  }, []);
+
+  // Full initial load (all sections)
   const doFetch = useCallback(async (b: number, isRefresh = false) => {
-    if (!isRefresh && hasData.current) return;
     if (!isRefresh) setLoading(true);
     setError(null);
     try {
-      // Try cache first (not on refresh)
-      if (!isRefresh) {
-        const cached = await AsyncStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const data: CacheData = JSON.parse(cached);
-          if (Date.now() - data.timestamp < CACHE_TTL && data.budget === b) {
-            setCoeurs(shuffle(data.coeurs).slice(0, 10));
-            setDeals(mergeDeals(data.sweetSpot || [], data.deals));
-            setPromos(data.promos);
-            hasData.current = true;
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
       const floor = getFloor(b);
       const [coeurRes, dealsRes, sweetRes, promoRes] = await Promise.all([
         saqApi.coeur({ limit: 30 }),
         saqApi.deals({ budget: b, limit: 10 }),
-        // Fetch wines in the sweet-spot range (e.g. 20-25$ for budget 25$)
         floor > 0
           ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5 })
           : Promise.resolve({ wines: [] as Wine[] } as any),
@@ -93,17 +97,7 @@ export default function DealsScreen() {
       setCoeurs(shuffle(coeurRes.wines).slice(0, 10));
       setDeals(mergeDeals(sweetRes.wines || [], dealsRes.wines));
       setPromos(promoRes.wines);
-      hasData.current = true;
-
-      // Save to cache
-      AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
-        coeurs: coeurRes.wines,
-        deals: dealsRes.wines,
-        sweetSpot: sweetRes.wines || [],
-        promos: promoRes.wines,
-        budget: b,
-        timestamp: Date.now(),
-      } as CacheData)).catch(() => {});
+      initialLoaded.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.error);
     } finally {
@@ -112,15 +106,14 @@ export default function DealsScreen() {
     }
   }, [t]);
 
-  // Persist budget when changed — immediately fetch for new budget
+  // Budget change: update state + fetch only deals section
   const handleBudgetChange = useCallback((b: number) => {
     setBudget(b);
-    hasData.current = false;
     AsyncStorage.setItem(BUDGET_KEY, String(b)).catch(() => {});
-    doFetch(b);
-  }, [doFetch]);
+    fetchDealsOnly(b);
+  }, [fetchDealsOnly]);
 
-  // Load persisted budget then fetch
+  // Load persisted budget then initial fetch
   useEffect(() => {
     AsyncStorage.getItem(BUDGET_KEY).then((val) => {
       const b = val ? Number(val) : 25;
@@ -133,13 +126,12 @@ export default function DealsScreen() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    hasData.current = false;
     await doFetch(budget, true);
   }, [doFetch, budget]);
 
-  // Only show full-screen skeleton on first load (no data yet)
-  if (loading && !hasData.current) return <DealsSkeleton />;
-  if (error && !hasData.current) return <EmptyState icon="cloud-offline-outline" message={t.deals.error} submessage={error} onRetry={() => { hasData.current = false; doFetch(budget); }} />;
+  // Only show full-screen skeleton on first load
+  if (loading && !initialLoaded.current) return <DealsSkeleton />;
+  if (error && !initialLoaded.current) return <EmptyState icon="cloud-offline-outline" message={t.deals.error} submessage={error} onRetry={() => doFetch(budget)} />;
 
   return (
     <ScrollView
@@ -184,7 +176,9 @@ export default function DealsScreen() {
             </Pressable>
           ))}
         </ScrollView>
-        {deals.length === 0 ? (
+        {dealsLoading ? (
+          <Text style={styles.emptyText}>{t.deals.loading}</Text>
+        ) : deals.length === 0 ? (
           <Text style={styles.emptyText}>{t.deals.noDeal}</Text>
         ) : (
           deals.map((wine) => <WineCard key={wine.id} wine={wine} />)
