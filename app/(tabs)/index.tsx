@@ -9,7 +9,6 @@ import SearchCacheClass from '@/services/searchCache';
 import type { Wine } from '@/types/wine';
 import { useTranslation } from '@/i18n';
 import { useSearchHistory } from '@/context/SearchHistoryContext';
-import { useTasteProfile } from '@/context/TasteProfileContext';
 import SearchBar from '@/components/SearchBar';
 import WineCard from '@/components/WineCard';
 import EmptyState from '@/components/EmptyState';
@@ -22,7 +21,6 @@ export default function SearchScreen() {
   const t = useTranslation();
   const router = useRouter();
   const { history, addEntry, removeEntry, clearHistory } = useSearchHistory();
-  const { profile } = useTasteProfile();
   const params = useLocalSearchParams<{ query?: string }>();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>({ onlySale: false, onlyOrganic: false, onlyExpert: false });
@@ -182,18 +180,6 @@ export default function SearchScreen() {
         </Pressable>
       </ScrollView>
 
-      {/* Quiz banner */}
-      {!profile?.completed && !hasSearched && (
-        <Pressable onPress={() => router.push('/quiz')} style={styles.quizBanner}>
-          <Ionicons name="sparkles" size={20} color={COLORS.gold} />
-          <View style={styles.quizBannerText}>
-            <Text style={styles.quizBannerTitle}>{t.quiz.start}</Text>
-            <Text style={styles.quizBannerSub}>{t.quiz.startSub}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
-        </Pressable>
-      )}
-
       {/* Search history */}
       {!hasSearched && history.length > 0 && (
         <View style={styles.historySection}>
@@ -226,7 +212,7 @@ export default function SearchScreen() {
         <EmptyState message={t.search.noResults} submessage={t.search.noResultsSub} />
       )}
 
-      {!loading && !error && !hasSearched && history.length === 0 && !profile?.completed && (
+      {!loading && !error && !hasSearched && history.length === 0 && (
         <EmptyState icon="search-outline" message={t.search.searchWine} submessage={t.search.searchWineSub} />
       )}
 
@@ -336,31 +322,6 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: SPACING.xl,
-  },
-  quizBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.gold + '40',
-  },
-  quizBannerText: {
-    flex: 1,
-    marginLeft: SPACING.sm,
-  },
-  quizBannerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.black,
-  },
-  quizBannerSub: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 1,
   },
   historySection: {
     paddingHorizontal: SPACING.md,

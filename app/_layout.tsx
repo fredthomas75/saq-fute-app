@@ -10,7 +10,7 @@ import { FavoritesProvider } from '@/context/FavoritesContext';
 import { SettingsProvider } from '@/context/SettingsContext';
 import { SearchHistoryProvider } from '@/context/SearchHistoryContext';
 import { CellarProvider } from '@/context/CellarContext';
-import { TasteProfileProvider } from '@/context/TasteProfileContext';
+
 import { WishlistProvider } from '@/context/WishlistContext';
 import { WineNotesProvider } from '@/context/WineNotesContext';
 import { ToastProvider } from '@/context/ToastContext';
@@ -42,7 +42,6 @@ function StackNavigator() {
       <Stack.Screen name="wine/[id]" options={{ title: t.wineDetail.title }} />
       <Stack.Screen name="settings" options={{ title: t.settings.title }} />
       <Stack.Screen name="cellar" options={{ title: t.cellar.title }} />
-      <Stack.Screen name="quiz" options={{ title: t.quiz.title, presentation: 'modal' }} />
       <Stack.Screen name="camera" options={{ title: t.camera.title, headerShown: false }} />
       <Stack.Screen name="menu-scan" options={{ title: t.menuScan.title }} />
       <Stack.Screen name="map" options={{ title: t.map.title }} />
@@ -80,12 +79,10 @@ export default function RootLayout() {
           <CellarProvider>
             <WishlistProvider>
             <WineNotesProvider>
-            <TasteProfileProvider>
             <ToastProvider>
               <StatusBar style="light" />
               <StackNavigator />
             </ToastProvider>
-            </TasteProfileProvider>
             </WineNotesProvider>
             </WishlistProvider>
           </CellarProvider>

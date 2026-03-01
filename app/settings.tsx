@@ -6,7 +6,6 @@ import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { useSettings } from '@/context/SettingsContext';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useCellar } from '@/context/CellarContext';
-import { useTasteProfile } from '@/context/TasteProfileContext';
 import { useTranslation } from '@/i18n';
 import type { Locale } from '@/i18n';
 import Logo from '@/components/Logo';
@@ -28,8 +27,6 @@ export default function SettingsScreen() {
   const { language, setLanguage, theme, setTheme, notifications, setNotifications } = useSettings();
   const { favorites, clearAll } = useFavorites();
   const { cellar, totalBottles, clearCellar } = useCellar();
-  const { profile, clearProfile } = useTasteProfile();
-
   const themeLabels: Record<string, string> = {
     auto: t.settings.themeAuto,
     light: t.settings.themeLight,
@@ -67,11 +64,6 @@ export default function SettingsScreen() {
           <MaterialCommunityIcons name="bottle-wine-outline" size={24} color={COLORS.burgundy} />
           <Text style={styles.quickLabel}>{t.cellar.title}</Text>
           {totalBottles > 0 && <Text style={styles.quickBadge}>{totalBottles}</Text>}
-        </Pressable>
-        <Pressable onPress={() => router.push('/quiz')} style={styles.quickBtn}>
-          <Ionicons name="sparkles" size={24} color={COLORS.gold} />
-          <Text style={styles.quickLabel}>{t.quiz.title}</Text>
-          {profile?.completed && <Ionicons name="checkmark-circle" size={16} color={COLORS.gold} />}
         </Pressable>
         <Pressable onPress={() => router.push('/map')} style={styles.quickBtn}>
           <Ionicons name="map-outline" size={24} color={COLORS.burgundy} />
@@ -164,18 +156,6 @@ export default function SettingsScreen() {
               </Text>
             </View>
             <Ionicons name="trash-outline" size={20} color={COLORS.red} />
-          </Pressable>
-        </View>
-      )}
-
-      {profile?.completed && (
-        <View style={styles.card}>
-          <Pressable onPress={clearProfile} style={styles.dangerRow}>
-            <View>
-              <Text style={styles.cardLabel}>{t.quiz.retake}</Text>
-              <Text style={styles.cardSub}>{t.quiz.myProfile}</Text>
-            </View>
-            <Ionicons name="refresh-outline" size={20} color={COLORS.burgundy} />
           </Pressable>
         </View>
       )}
