@@ -49,8 +49,8 @@ export default function MapScreen() {
     setRegionData(null);
     try {
       const [regular, vip] = await Promise.all([
-        saqApi.search({ query: country, limit: 100 }),
-        saqApi.search({ query: country, limit: 50, vip: true }),
+        saqApi.search({ country, limit: 100 }),
+        saqApi.search({ country, limit: 50, vip: true }),
       ]);
       const seen = new Set<string>();
       const allWines: any[] = [];

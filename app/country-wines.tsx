@@ -39,8 +39,8 @@ export default function CountryWinesScreen() {
   useEffect(() => {
     if (country) {
       Promise.all([
-        saqApi.search({ query: country, limit: 100 }),
-        saqApi.search({ query: country, limit: 50, vip: true }),
+        saqApi.search({ country, limit: 100 }),
+        saqApi.search({ country, limit: 50, vip: true }),
       ])
         .then(([regular, vip]) => {
           const seen = new Set<string>();
