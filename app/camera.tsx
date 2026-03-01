@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
-import { analyzeWineLabel } from '@/services/chat';
+import { analyzeWineLabel, readBarcodeFromImage } from '@/services/chat';
 import { useTranslation } from '@/i18n';
 
 let Haptics: any = null;
@@ -74,20 +74,35 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   const hasLaunchedScanner = useRef(false);
   const webScanIntervalRef = useRef<any>(null);
 
-  // Search wine by name — multiple strategies
-  const searchWineByName = useCallback(async (wineName: string): Promise<boolean> => {
-    setScanStatus(`${t.camera.searchingShort} ${wineName}...`);
+  // Clean wine name from AI response
+  const cleanWineName = (raw: string): string => {
+    let name = raw.trim();
+    // Remove surrounding quotes
+    name = name.replace(/^["'«»""'']+|["'«»""'']+$/g, '');
+    // Remove common AI prefixes
+    name = name.replace(/^(Le vin est|C'est|Il s'agit de|The wine is)\s+/i, '');
+    // Remove trailing period/punctuation
+    name = name.replace(/[.!]+$/, '');
+    return name.trim();
+  };
+
+  // Try to search and navigate to a wine result
+  const trySearch = useCallback(async (query: string): Promise<boolean> => {
+    if (!query || query.length < 2) return false;
     try {
-      const result = await saqApi.search({ query: wineName.trim(), limit: 5 });
+      const result = await saqApi.search({ query, limit: 5 });
       if (result.wines.length > 0) {
         router.replace({ pathname: '/wine/[id]', params: { id: result.wines[0].id } });
         return true;
       }
     } catch {}
+    return false;
+  }, [router]);
 
-    setScanStatus(t.camera.searchingSAQ);
+  const tryBrowse = useCallback(async (query: string): Promise<boolean> => {
+    if (!query || query.length < 2) return false;
     try {
-      const browseResult = await saqApi.browse(wineName.trim());
+      const browseResult = await saqApi.browse(query);
       if (browseResult.wines && browseResult.wines.length > 0) {
         const wine = browseResult.wines[0];
         if (wine.id) {
@@ -100,22 +115,51 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         }
       }
     } catch {}
+    return false;
+  }, [router]);
 
-    const words = wineName.trim().split(/\s+/);
+  // Search wine by name — multiple strategies with progressive simplification
+  const searchWineByName = useCallback(async (rawName: string): Promise<boolean> => {
+    const name = cleanWineName(rawName);
+    const nameNoYear = name.replace(/\b(19|20)\d{2}\b/g, '').trim();
+    const words = name.split(/\s+/).filter(w => w.length > 1);
+
+    // Strategy 1: full cleaned name in local DB
+    setScanStatus(`${t.camera.searchingShort} ${name}...`);
+    if (await trySearch(name)) return true;
+
+    // Strategy 2: name without year
+    if (nameNoYear !== name && nameNoYear.length > 2) {
+      setScanStatus(`${t.camera.searchingShort} ${nameNoYear}...`);
+      if (await trySearch(nameNoYear)) return true;
+    }
+
+    // Strategy 3: browse SAQ.com with full name
+    setScanStatus(t.camera.searchingSAQ);
+    if (await tryBrowse(name)) return true;
+
+    // Strategy 4: browse without year
+    if (nameNoYear !== name && nameNoYear.length > 2) {
+      if (await tryBrowse(nameNoYear)) return true;
+    }
+
+    // Strategy 5: first 2 words only
     if (words.length > 2) {
-      const shortQuery = words.slice(0, 3).join(' ');
-      setScanStatus(`${t.camera.searchingShort} ${shortQuery}...`);
-      try {
-        const result = await saqApi.search({ query: shortQuery, limit: 5 });
-        if (result.wines.length > 0) {
-          router.replace({ pathname: '/wine/[id]', params: { id: result.wines[0].id } });
-          return true;
-        }
-      } catch {}
+      const short2 = words.slice(0, 2).join(' ');
+      setScanStatus(`${t.camera.searchingShort} ${short2}...`);
+      if (await trySearch(short2)) return true;
+      if (await tryBrowse(short2)) return true;
+    }
+
+    // Strategy 6: first 3 words
+    if (words.length > 3) {
+      const short3 = words.slice(0, 3).join(' ');
+      setScanStatus(`${t.camera.searchingShort} ${short3}...`);
+      if (await trySearch(short3)) return true;
     }
 
     return false;
-  }, [router, t]);
+  }, [trySearch, tryBrowse, t]);
 
   // Process a scanned barcode
   const processBarcode = useCallback((data: string) => {
@@ -162,13 +206,42 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     })();
   }, [router]);
 
+  // Web: capture photo and read barcode via vision API (fallback for browsers without BarcodeDetector)
+  const handleWebBarcodeCapture = useCallback(async () => {
+    if (!cameraRef.current || analyzing) return;
+    setAnalyzing(true);
+    setScanStatus(t.camera.captureStatus);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.8 });
+      const base64Data = extractBase64(photo);
+      if (!base64Data) {
+        throw new Error(t.camera.captureError);
+      }
+      setScanStatus(t.camera.analyzing);
+      const code = await readBarcodeFromImage(base64Data);
+      if (code) {
+        setAnalyzing(false);
+        processBarcode(code);
+        return;
+      }
+      // No barcode found by vision — offer manual entry
+      setAnalyzing(false);
+      setScanStatus('');
+      setShowManualInput(true);
+    } catch {
+      setAnalyzing(false);
+      setScanStatus('');
+      setShowManualInput(true);
+    }
+  }, [analyzing, processBarcode, t]);
+
   // Web: continuous barcode scanning using BarcodeDetector on video element
   const startWebContinuousScan = useCallback(() => {
     if (!isWeb || webScanIntervalRef.current) return;
 
     const hasBarcodeDetector = typeof (window as any).BarcodeDetector !== 'undefined';
     if (!hasBarcodeDetector) {
-      setScanStatus(t.camera.webNoDetector);
+      // No BarcodeDetector — user will use capture button or manual entry
       return;
     }
 
@@ -478,7 +551,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         {/* Actions */}
         {mode === 'barcode' ? (
           <View style={styles.barcodeControls}>
-            {/* On native: scanner button. On web: scan is automatic, show manual entry */}
+            {/* Native: modern scanner button */}
             {!isWeb && isModernScannerAvailable && (
               <Pressable onPress={launchModernScanner} style={styles.scanActionBtn}>
                 <Ionicons name="scan" size={28} color={COLORS.white} />
@@ -486,10 +559,24 @@ function CameraContent({ router, t }: { router: any; t: any }) {
               </Pressable>
             )}
 
+            {/* Web: capture + AI barcode reading (works on all browsers) */}
+            {isWeb && (
+              <Pressable onPress={handleWebBarcodeCapture} style={styles.scanActionBtn} disabled={analyzing}>
+                {analyzing ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Ionicons name="scan" size={28} color={COLORS.white} />
+                )}
+                <Text style={styles.scanActionText}>
+                  {analyzing ? t.camera.analyzing : t.camera.barcode}
+                </Text>
+              </Pressable>
+            )}
+
             {/* Manual entry — always available */}
-            <Pressable onPress={() => setShowManualInput(true)} style={isWeb ? styles.scanActionBtn : styles.manualEntryLink}>
-              <Ionicons name="keypad-outline" size={isWeb ? 24 : 16} color={COLORS.white + (isWeb ? 'FF' : 'CC')} />
-              <Text style={isWeb ? styles.scanActionText : styles.manualEntryText}>
+            <Pressable onPress={() => setShowManualInput(true)} style={styles.manualEntryLink}>
+              <Ionicons name="keypad-outline" size={16} color={COLORS.white + 'CC'} />
+              <Text style={styles.manualEntryText}>
                 {t.camera.manualEntry}
               </Text>
             </Pressable>
