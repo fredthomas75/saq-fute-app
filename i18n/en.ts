@@ -217,6 +217,7 @@ export const en: typeof fr = {
     searchingShort: 'Searching:',
     codeDetected: 'Code:',
     identifyingProduct: 'Identifying product...',
+    captureBarcode: 'Scan barcode',
   },
 
   menuScan: {

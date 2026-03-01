@@ -215,6 +215,7 @@ export const fr = {
     searchingShort: 'Recherche:',
     codeDetected: 'Code:',
     identifyingProduct: 'Identification du produit...',
+    captureBarcode: 'Scanner le code',
   },
 
   menuScan: {

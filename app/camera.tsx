@@ -306,8 +306,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
 
     const hasBarcodeDetector = typeof (window as any).BarcodeDetector !== 'undefined';
     if (!hasBarcodeDetector) {
-      // No BarcodeDetector (Safari/iOS) — show manual entry immediately
-      setShowManualInput(true);
+      // No BarcodeDetector (Safari/iOS) — keep camera visible, user can tap capture button
       return;
     }
 
@@ -655,6 +654,14 @@ function CameraContent({ router, t }: { router: any; t: any }) {
                 <ActivityIndicator size="small" color={COLORS.white} />
                 <Text style={styles.scanActionText}>{t.camera.scanning}</Text>
               </View>
+            )}
+
+            {/* Web without BarcodeDetector (Safari/iOS): capture button to read barcode via AI */}
+            {isWeb && typeof (globalThis as any).BarcodeDetector === 'undefined' && (
+              <Pressable onPress={handleWebBarcodeCapture} style={styles.scanActionBtn} disabled={analyzing}>
+                <Ionicons name="camera-outline" size={28} color={COLORS.white} />
+                <Text style={styles.scanActionText}>{t.camera.captureBarcode}</Text>
+              </Pressable>
             )}
 
             {/* Manual entry — always available */}
