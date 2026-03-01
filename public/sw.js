@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saq-fute-v2';
+const CACHE_NAME = 'saq-fute-v3';
 
 // Install: skip waiting to activate immediately
 self.addEventListener('install', (event) => {
