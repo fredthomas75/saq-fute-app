@@ -23,6 +23,20 @@ try {
 const isWeb = Platform.OS === 'web';
 const BARCODE_SETTINGS = { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'qr'] as const };
 
+// Helper: extract raw base64 from takePictureAsync result (handles web data URL vs native raw base64)
+function extractBase64(photo: { base64?: string; uri?: string }): string | null {
+  let b64 = photo.base64 || '';
+  // On web, base64 is a full data URL — strip the prefix
+  if (b64.startsWith('data:')) {
+    b64 = b64.split(',')[1] || '';
+  }
+  // If still empty, try extracting from uri
+  if (!b64 && photo.uri?.startsWith('data:')) {
+    b64 = photo.uri.split(',')[1] || '';
+  }
+  return b64 || null;
+}
+
 export default function CameraScreen() {
   const t = useTranslation();
   const router = useRouter();
@@ -58,11 +72,11 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   const [detectedLabel, setDetectedLabel] = useState<string | null>(null);
   const modernListenerRef = useRef<any>(null);
   const hasLaunchedScanner = useRef(false);
+  const webScanIntervalRef = useRef<any>(null);
 
   // Search wine by name — multiple strategies
   const searchWineByName = useCallback(async (wineName: string): Promise<boolean> => {
-    // Strategy 1: local DB
-    setScanStatus(`Recherche: ${wineName}...`);
+    setScanStatus(`${t.camera.searchingShort} ${wineName}...`);
     try {
       const result = await saqApi.search({ query: wineName.trim(), limit: 5 });
       if (result.wines.length > 0) {
@@ -71,8 +85,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       }
     } catch {}
 
-    // Strategy 2: SAQ.com browse
-    setScanStatus('Recherche sur SAQ.com...');
+    setScanStatus(t.camera.searchingSAQ);
     try {
       const browseResult = await saqApi.browse(wineName.trim());
       if (browseResult.wines && browseResult.wines.length > 0) {
@@ -88,11 +101,10 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       }
     } catch {}
 
-    // Strategy 3: shorter query (first 2-3 words)
     const words = wineName.trim().split(/\s+/);
     if (words.length > 2) {
       const shortQuery = words.slice(0, 3).join(' ');
-      setScanStatus(`Recherche: ${shortQuery}...`);
+      setScanStatus(`${t.camera.searchingShort} ${shortQuery}...`);
       try {
         const result = await saqApi.search({ query: shortQuery, limit: 5 });
         if (result.wines.length > 0) {
@@ -103,27 +115,32 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     }
 
     return false;
-  }, [router]);
+  }, [router, t]);
 
   // Process a scanned barcode
   const processBarcode = useCallback((data: string) => {
     if (scannedRef.current) return;
     scannedRef.current = true;
     setScanned(true);
+    // Stop web continuous scan
+    if (webScanIntervalRef.current) {
+      clearInterval(webScanIntervalRef.current);
+      webScanIntervalRef.current = null;
+    }
     try { Haptics?.impactAsync?.(Haptics.ImpactFeedbackStyle?.Medium); } catch {}
     try { CameraViewComponent?.dismissScanner?.(); } catch {}
 
-    setScanStatus(`Code: ${data}`);
+    setScanStatus(`${t.camera.codeDetected} ${data}`);
 
     (async () => {
       try {
-        setScanStatus(`Recherche de ${data}...`);
+        setScanStatus(`${t.camera.searchingFor} ${data}...`);
         const result = await saqApi.search({ query: data, limit: 1 });
         if (result.wines.length > 0) {
           router.replace({ pathname: '/wine/[id]', params: { id: result.wines[0].id } });
           return;
         }
-        setScanStatus('Recherche sur SAQ.com...');
+        setScanStatus(t.camera.searchingSAQ);
         const browseResult = await saqApi.browse(data);
         if (browseResult.wines && browseResult.wines.length > 0) {
           const wine = browseResult.wines[0];
@@ -145,51 +162,61 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     })();
   }, [router]);
 
-  // Web: try BarcodeDetector API to read barcode from captured photo
-  const tryWebBarcodeDetect = useCallback(async (imageDataUrl: string): Promise<string | null> => {
-    if (!isWeb) return null;
+  // Web: continuous barcode scanning using BarcodeDetector on video element
+  const startWebContinuousScan = useCallback(() => {
+    if (!isWeb || webScanIntervalRef.current) return;
+
+    const hasBarcodeDetector = typeof (window as any).BarcodeDetector !== 'undefined';
+    if (!hasBarcodeDetector) {
+      setScanStatus(t.camera.webNoDetector);
+      return;
+    }
+
     try {
-      // Check if BarcodeDetector is available (Chrome 83+)
-      if (typeof (window as any).BarcodeDetector !== 'undefined') {
-        const detector = new (window as any).BarcodeDetector({
-          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'],
-        });
-        const img = new Image();
-        img.src = imageDataUrl;
-        await new Promise((resolve) => { img.onload = resolve; });
-        const results = await detector.detect(img);
-        if (results.length > 0) {
-          return results[0].rawValue;
+      const detector = new (window as any).BarcodeDetector({
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'],
+      });
+
+      setScanStatus(t.camera.webScanning);
+
+      webScanIntervalRef.current = setInterval(async () => {
+        if (scannedRef.current) {
+          clearInterval(webScanIntervalRef.current);
+          webScanIntervalRef.current = null;
+          return;
         }
-      }
-    } catch {}
-    return null;
+        try {
+          // Find the video element rendered by CameraView
+          const video = document.querySelector('video');
+          if (!video || video.readyState < 2) return; // Not ready yet
+          const results = await detector.detect(video);
+          if (results.length > 0 && results[0].rawValue) {
+            processBarcode(results[0].rawValue);
+          }
+        } catch {
+          // Ignore frame errors, keep scanning
+        }
+      }, 600);
+    } catch {
+      setScanStatus(t.camera.webScanError);
+    }
+  }, [processBarcode, t]);
+
+  // Stop web continuous scan
+  const stopWebContinuousScan = useCallback(() => {
+    if (webScanIntervalRef.current) {
+      clearInterval(webScanIntervalRef.current);
+      webScanIntervalRef.current = null;
+    }
   }, []);
 
-  // Web barcode capture: take photo → try BarcodeDetector
-  const handleWebBarcodeScan = useCallback(async () => {
-    if (!cameraRef.current || analyzing) return;
-    setAnalyzing(true);
-    setScanStatus('Analyse du code-barres...');
-    try {
-      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.8 });
-      const dataUrl = `data:image/jpeg;base64,${photo.base64}`;
-      const code = await tryWebBarcodeDetect(dataUrl);
-      if (code) {
-        setAnalyzing(false);
-        processBarcode(code);
-        return;
-      }
-      // BarcodeDetector not available or no barcode found
-      setScanStatus('');
-      setAnalyzing(false);
-      setShowManualInput(true);
-    } catch {
-      setScanStatus('');
-      setAnalyzing(false);
-      setShowManualInput(true);
+  // Start continuous web scan when camera is ready in barcode mode
+  useEffect(() => {
+    if (isWeb && cameraReady && mode === 'barcode' && !scanned) {
+      startWebContinuousScan();
     }
-  }, [analyzing, processBarcode, tryWebBarcodeDetect]);
+    return () => stopWebContinuousScan();
+  }, [cameraReady, mode, scanned, startWebContinuousScan, stopWebContinuousScan]);
 
   // Old API: onBarcodeScanned (native only)
   const handleBarcodeScan = useCallback(({ data }: { data: string; type?: string }) => {
@@ -231,19 +258,20 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     }
   }, [cameraReady, mode, launchModernScanner]);
 
-  // Label capture
+  // Label capture — fixed for web (base64 extraction)
   const handleLabelCapture = useCallback(async () => {
     if (!cameraRef.current || analyzing) return;
     setAnalyzing(true);
     setDetectedLabel(null);
-    setScanStatus(t.camera.analyzing);
+    setScanStatus(t.camera.captureStatus);
     try {
       const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
-      if (!photo?.base64) {
-        throw new Error('No base64 data');
+      const base64Data = extractBase64(photo);
+      if (!base64Data) {
+        throw new Error(t.camera.captureError);
       }
-      setScanStatus('Identification du vin...');
-      const wineName = await analyzeWineLabel(photo.base64);
+      setScanStatus(t.camera.identifyingWine);
+      const wineName = await analyzeWineLabel(base64Data);
       setDetectedLabel(wineName.trim());
       setScanStatus('');
 
@@ -296,10 +324,11 @@ function CameraContent({ router, t }: { router: any; t: any }) {
 
   const switchToLabel = useCallback(() => {
     setMode('label');
+    stopWebContinuousScan();
     setScanStatus('');
     setNotFoundQuery(null);
     setDetectedLabel(null);
-  }, []);
+  }, [stopWebContinuousScan]);
 
   const onCameraReady = useCallback(() => {
     setCameraReady(true);
@@ -308,9 +337,10 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   // Cleanup
   useEffect(() => {
     return () => {
+      stopWebContinuousScan();
       try { CameraViewComponent?.dismissScanner?.(); } catch {}
     };
-  }, []);
+  }, [stopWebContinuousScan]);
 
   if (!permission) return <ActivityIndicator style={{ flex: 1 }} color={COLORS.burgundy} />;
 
@@ -362,7 +392,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
           <View style={styles.scanLineWrap}>
             <View style={styles.scanLine} />
             <Text style={styles.scanHint}>
-              {isWeb ? 'Cadrez le code-barres puis appuyez sur Scanner' : t.camera.scanning}
+              {isWeb ? t.camera.webScanHint : t.camera.scanning}
             </Text>
           </View>
         )}
@@ -386,7 +416,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
           <Ionicons name="search-outline" size={40} color={COLORS.white} />
           <Text style={styles.notFoundTitle}>{t.camera.notFound}</Text>
           {detectedLabel ? (
-            <Text style={styles.detectedLabelText}>« {detectedLabel} »</Text>
+            <Text style={styles.detectedLabelText}>{'\u00ab'} {detectedLabel} {'\u00bb'}</Text>
           ) : null}
           <Text style={styles.notFoundSub}>{t.camera.notFoundSub}</Text>
           <Pressable onPress={handleOpenSAQ} style={styles.saqBtn}>
@@ -402,12 +432,12 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       {/* Manual barcode input overlay */}
       {showManualInput && (
         <View style={styles.manualOverlay}>
-          <Text style={styles.manualTitle}>Entrer le code-barres</Text>
+          <Text style={styles.manualTitle}>{t.camera.manualTitle}</Text>
           <TextInput
             style={styles.manualInput}
             value={manualCode}
             onChangeText={setManualCode}
-            placeholder="Ex: 5603016000221"
+            placeholder={t.camera.manualPlaceholder}
             placeholderTextColor={COLORS.gray}
             keyboardType="number-pad"
             autoFocus
@@ -419,7 +449,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
             </Pressable>
             <Pressable onPress={handleManualSubmit} style={styles.manualSubmitBtn}>
               <Ionicons name="search" size={18} color={COLORS.white} />
-              <Text style={styles.manualSubmitText}>Chercher</Text>
+              <Text style={styles.manualSubmitText}>{t.camera.manualSubmit}</Text>
             </Pressable>
           </View>
         </View>
@@ -448,26 +478,20 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         {/* Actions */}
         {mode === 'barcode' ? (
           <View style={styles.barcodeControls}>
-            {/* Primary: capture/scan button */}
-            <Pressable
-              onPress={isWeb ? handleWebBarcodeScan : (isModernScannerAvailable ? launchModernScanner : handleRetry)}
-              style={styles.scanActionBtn}
-              disabled={analyzing}
-            >
-              {analyzing ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
-              ) : (
+            {/* On native: scanner button. On web: scan is automatic, show manual entry */}
+            {!isWeb && isModernScannerAvailable && (
+              <Pressable onPress={launchModernScanner} style={styles.scanActionBtn}>
                 <Ionicons name="scan" size={28} color={COLORS.white} />
-              )}
-              <Text style={styles.scanActionText}>
-                {analyzing ? 'Analyse...' : 'Scanner'}
-              </Text>
-            </Pressable>
+                <Text style={styles.scanActionText}>{t.camera.openScanner}</Text>
+              </Pressable>
+            )}
 
-            {/* Manual entry link */}
-            <Pressable onPress={() => setShowManualInput(true)} style={styles.manualEntryLink}>
-              <Ionicons name="keypad-outline" size={16} color={COLORS.white + 'CC'} />
-              <Text style={styles.manualEntryText}>Entrer le code manuellement</Text>
+            {/* Manual entry — always available */}
+            <Pressable onPress={() => setShowManualInput(true)} style={isWeb ? styles.scanActionBtn : styles.manualEntryLink}>
+              <Ionicons name="keypad-outline" size={isWeb ? 24 : 16} color={COLORS.white + (isWeb ? 'FF' : 'CC')} />
+              <Text style={isWeb ? styles.scanActionText : styles.manualEntryText}>
+                {t.camera.manualEntry}
+              </Text>
             </Pressable>
           </View>
         ) : (
