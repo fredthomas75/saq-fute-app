@@ -20,7 +20,7 @@ try {
   isModernScannerAvailable = CameraViewComponent?.isModernBarcodeScannerAvailable ?? false;
 } catch {}
 
-// Barcode scanner settings
+const isWeb = Platform.OS === 'web';
 const BARCODE_SETTINGS = { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'qr'] as const };
 
 export default function CameraScreen() {
@@ -59,9 +59,9 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   const modernListenerRef = useRef<any>(null);
   const hasLaunchedScanner = useRef(false);
 
-  // Search wine by name with multiple strategies
+  // Search wine by name — multiple strategies
   const searchWineByName = useCallback(async (wineName: string): Promise<boolean> => {
-    // Strategy 1: Search local DB
+    // Strategy 1: local DB
     setScanStatus(`Recherche: ${wineName}...`);
     try {
       const result = await saqApi.search({ query: wineName.trim(), limit: 5 });
@@ -71,7 +71,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       }
     } catch {}
 
-    // Strategy 2: Browse SAQ.com directly
+    // Strategy 2: SAQ.com browse
     setScanStatus('Recherche sur SAQ.com...');
     try {
       const browseResult = await saqApi.browse(wineName.trim());
@@ -88,7 +88,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       }
     } catch {}
 
-    // Strategy 3: Try with shorter query (first 2-3 words)
+    // Strategy 3: shorter query (first 2-3 words)
     const words = wineName.trim().split(/\s+/);
     if (words.length > 2) {
       const shortQuery = words.slice(0, 3).join(' ');
@@ -145,14 +145,60 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     })();
   }, [router]);
 
-  // Old API: onBarcodeScanned
+  // Web: try BarcodeDetector API to read barcode from captured photo
+  const tryWebBarcodeDetect = useCallback(async (imageDataUrl: string): Promise<string | null> => {
+    if (!isWeb) return null;
+    try {
+      // Check if BarcodeDetector is available (Chrome 83+)
+      if (typeof (window as any).BarcodeDetector !== 'undefined') {
+        const detector = new (window as any).BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'],
+        });
+        const img = new Image();
+        img.src = imageDataUrl;
+        await new Promise((resolve) => { img.onload = resolve; });
+        const results = await detector.detect(img);
+        if (results.length > 0) {
+          return results[0].rawValue;
+        }
+      }
+    } catch {}
+    return null;
+  }, []);
+
+  // Web barcode capture: take photo → try BarcodeDetector
+  const handleWebBarcodeScan = useCallback(async () => {
+    if (!cameraRef.current || analyzing) return;
+    setAnalyzing(true);
+    setScanStatus('Analyse du code-barres...');
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.8 });
+      const dataUrl = `data:image/jpeg;base64,${photo.base64}`;
+      const code = await tryWebBarcodeDetect(dataUrl);
+      if (code) {
+        setAnalyzing(false);
+        processBarcode(code);
+        return;
+      }
+      // BarcodeDetector not available or no barcode found
+      setScanStatus('');
+      setAnalyzing(false);
+      setShowManualInput(true);
+    } catch {
+      setScanStatus('');
+      setAnalyzing(false);
+      setShowManualInput(true);
+    }
+  }, [analyzing, processBarcode, tryWebBarcodeDetect]);
+
+  // Old API: onBarcodeScanned (native only)
   const handleBarcodeScan = useCallback(({ data }: { data: string; type?: string }) => {
     processBarcode(data);
   }, [processBarcode]);
 
-  // Modern scanner listener
+  // Modern scanner listener (native only)
   useEffect(() => {
-    if (!isModernScannerAvailable || !CameraViewComponent?.onModernBarcodeScanned) return;
+    if (isWeb || !isModernScannerAvailable || !CameraViewComponent?.onModernBarcodeScanned) return;
     const subscription = CameraViewComponent.onModernBarcodeScanned((event: { data: string; type?: string }) => {
       if (event.data) processBarcode(event.data);
     });
@@ -163,9 +209,9 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     };
   }, [processBarcode]);
 
-  // Launch modern scanner
+  // Launch modern scanner (native only)
   const launchModernScanner = useCallback(async () => {
-    if (!isModernScannerAvailable || !CameraViewComponent?.launchScanner) return;
+    if (isWeb || !isModernScannerAvailable || !CameraViewComponent?.launchScanner) return;
     try {
       await CameraViewComponent.launchScanner({
         barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'qr'],
@@ -176,38 +222,42 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     } catch {}
   }, []);
 
-  // Auto-launch modern scanner on camera ready (native only)
+  // Auto-launch modern scanner on native
   useEffect(() => {
-    if (cameraReady && mode === 'barcode' && isModernScannerAvailable && !hasLaunchedScanner.current && Platform.OS !== 'web') {
+    if (cameraReady && mode === 'barcode' && isModernScannerAvailable && !hasLaunchedScanner.current && !isWeb) {
       hasLaunchedScanner.current = true;
-      // Small delay for camera to stabilize
       const timer = setTimeout(() => launchModernScanner(), 500);
       return () => clearTimeout(timer);
     }
   }, [cameraReady, mode, launchModernScanner]);
 
-  // Label capture with improved search
+  // Label capture
   const handleLabelCapture = useCallback(async () => {
     if (!cameraRef.current || analyzing) return;
     setAnalyzing(true);
     setDetectedLabel(null);
-    setScanStatus('');
+    setScanStatus(t.camera.analyzing);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.6 });
-      setScanStatus(t.camera.analyzing);
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
+      if (!photo?.base64) {
+        throw new Error('No base64 data');
+      }
+      setScanStatus('Identification du vin...');
       const wineName = await analyzeWineLabel(photo.base64);
       setDetectedLabel(wineName.trim());
+      setScanStatus('');
 
       const found = await searchWineByName(wineName);
       if (!found) {
         setNotFoundQuery(wineName.trim());
       }
-    } catch {
+    } catch (err) {
+      console.warn('Label capture error:', err);
       setNotFoundQuery('');
     }
     setAnalyzing(false);
     setScanStatus('');
-  }, [router, analyzing, searchWineByName, t]);
+  }, [analyzing, searchWineByName, t]);
 
   // Manual barcode entry
   const handleManualSubmit = useCallback(() => {
@@ -286,8 +336,8 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         ref={cameraRef}
         style={StyleSheet.absoluteFillObject}
         facing="back"
-        barcodeScannerSettings={mode === 'barcode' ? BARCODE_SETTINGS : undefined}
-        onBarcodeScanned={mode === 'barcode' && !scanned ? handleBarcodeScan : undefined}
+        barcodeScannerSettings={mode === 'barcode' && !isWeb ? BARCODE_SETTINGS : undefined}
+        onBarcodeScanned={mode === 'barcode' && !scanned && !isWeb ? handleBarcodeScan : undefined}
         onCameraReady={onCameraReady}
       />
 
@@ -305,22 +355,24 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         {analyzing && (
           <View style={styles.analyzingOverlay}>
             <ActivityIndicator size="large" color={COLORS.white} />
-            <Text style={styles.analyzingText}>{t.camera.analyzing}</Text>
+            <Text style={styles.analyzingText}>{scanStatus || t.camera.analyzing}</Text>
           </View>
         )}
         {mode === 'barcode' && !scanned && !analyzing && (
           <View style={styles.scanLineWrap}>
             <View style={styles.scanLine} />
-            <Text style={styles.scanHint}>{t.camera.scanning}</Text>
+            <Text style={styles.scanHint}>
+              {isWeb ? 'Cadrez le code-barres puis appuyez sur Scanner' : t.camera.scanning}
+            </Text>
           </View>
         )}
-        {scanStatus !== '' && (
+        {!analyzing && scanStatus !== '' && (
           <View style={styles.scanStatusWrap}>
             <ActivityIndicator size="small" color={COLORS.white} />
             <Text style={styles.scanStatusText}>{scanStatus}</Text>
           </View>
         )}
-        {detectedLabel && !notFoundQuery && (
+        {detectedLabel && !notFoundQuery && !analyzing && (
           <View style={styles.scanStatusWrap}>
             <Ionicons name="wine-outline" size={16} color={COLORS.white} />
             <Text style={styles.scanStatusText}>{detectedLabel}</Text>
@@ -333,9 +385,9 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         <View style={styles.notFoundOverlay}>
           <Ionicons name="search-outline" size={40} color={COLORS.white} />
           <Text style={styles.notFoundTitle}>{t.camera.notFound}</Text>
-          {detectedLabel && (
+          {detectedLabel ? (
             <Text style={styles.detectedLabelText}>« {detectedLabel} »</Text>
-          )}
+          ) : null}
           <Text style={styles.notFoundSub}>{t.camera.notFoundSub}</Text>
           <Pressable onPress={handleOpenSAQ} style={styles.saqBtn}>
             <Ionicons name="open-outline" size={18} color={COLORS.white} />
@@ -396,11 +448,19 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         {/* Actions */}
         {mode === 'barcode' ? (
           <View style={styles.barcodeControls}>
-            {/* Primary action: scan button */}
-            <Pressable onPress={isModernScannerAvailable && Platform.OS !== 'web' ? launchModernScanner : handleRetry} style={styles.scanActionBtn}>
-              <Ionicons name="scan" size={28} color={COLORS.white} />
+            {/* Primary: capture/scan button */}
+            <Pressable
+              onPress={isWeb ? handleWebBarcodeScan : (isModernScannerAvailable ? launchModernScanner : handleRetry)}
+              style={styles.scanActionBtn}
+              disabled={analyzing}
+            >
+              {analyzing ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : (
+                <Ionicons name="scan" size={28} color={COLORS.white} />
+              )}
               <Text style={styles.scanActionText}>
-                {isModernScannerAvailable ? (t.camera.openScanner || 'Scanner') : t.camera.scanning}
+                {analyzing ? 'Analyse...' : 'Scanner'}
               </Text>
             </Pressable>
 
@@ -411,9 +471,14 @@ function CameraContent({ router, t }: { router: any; t: any }) {
             </Pressable>
           </View>
         ) : (
-          <Pressable onPress={handleLabelCapture} style={styles.captureBtn} disabled={analyzing}>
-            <View style={styles.captureInner} />
-          </Pressable>
+          <View style={styles.labelControls}>
+            <Pressable onPress={handleLabelCapture} style={styles.captureBtn} disabled={analyzing}>
+              <View style={[styles.captureInner, analyzing && { opacity: 0.5 }]} />
+            </Pressable>
+            <Text style={styles.captureHint}>
+              {analyzing ? t.camera.analyzing : t.camera.capture}
+            </Text>
+          </View>
         )}
       </View>
     </KeyboardAvoidingView>
@@ -470,6 +535,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     textAlign: 'center',
     opacity: 0.7,
+    paddingHorizontal: SPACING.md,
   },
   scanStatusWrap: {
     position: 'absolute',
@@ -491,7 +557,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   analyzingOverlay: { alignItems: 'center', gap: SPACING.sm },
-  analyzingText: { color: COLORS.white, fontSize: 15, fontWeight: '600' },
+  analyzingText: { color: COLORS.white, fontSize: 15, fontWeight: '600', textAlign: 'center' },
   bottom: { paddingBottom: 50, paddingHorizontal: SPACING.md, alignItems: 'center', gap: SPACING.md },
   modeToggle: {
     flexDirection: 'row',
@@ -527,6 +593,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+    minWidth: 180,
+    justifyContent: 'center',
   },
   scanActionText: {
     color: COLORS.white,
@@ -544,6 +612,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textDecorationLine: 'underline',
   },
+  labelControls: {
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
   captureBtn: {
     width: 72,
     height: 72,
@@ -554,6 +626,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   captureInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.white },
+  captureHint: {
+    color: COLORS.white + 'AA',
+    fontSize: 13,
+    fontWeight: '600',
+  },
   notFoundOverlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
