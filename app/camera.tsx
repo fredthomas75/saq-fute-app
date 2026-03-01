@@ -77,12 +77,20 @@ function CameraContent({ router, t }: { router: any; t: any }) {
   // Clean wine name from AI response
   const cleanWineName = (raw: string): string => {
     let name = raw.trim();
+    // If multi-line, take only the first non-empty line
+    const lines = name.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length > 1) name = lines[0];
     // Remove surrounding quotes
     name = name.replace(/^["'«»""'']+|["'«»""'']+$/g, '');
-    // Remove common AI prefixes
-    name = name.replace(/^(Le vin est|C'est|Il s'agit de|The wine is)\s+/i, '');
-    // Remove trailing period/punctuation
-    name = name.replace(/[.!]+$/, '');
+    // Remove common AI prefixes (FR + EN)
+    name = name.replace(/^(Le vin est|C'est un?|Il s'agit d[eu']?\s*|The wine is|This is|It'?s a?)\s*/i, '');
+    // Remove markdown bold
+    name = name.replace(/\*\*/g, '');
+    // Remove trailing period/punctuation/parenthetical
+    name = name.replace(/\s*\(.*?\)\s*$/, '');
+    name = name.replace(/[.!:]+$/, '');
+    // Remove trailing descriptors after comma (e.g. "Mouton Cadet, Bordeaux 2022")
+    name = name.replace(/,\s*(Bordeaux|Bourgogne|Rioja|Toscane|Napa|Barossa|Mendoza|Valle|Vallée|AOC|AOP|DOC|DOCG|IGP|Vin de|Wine from).*$/i, '');
     return name.trim();
   };
 
