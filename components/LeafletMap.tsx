@@ -233,11 +233,18 @@ function generateLeafletHTML(
 
     function getColor(count) {
       if (!count) return 'transparent';
-      var ratio = count / MAX_COUNT;
-      if (ratio > 0.7) return '${COLORS.burgundy}';
-      if (ratio > 0.4) return '${COLORS.burgundyLight}';
-      if (ratio > 0.15) return '${COLORS.gold}';
-      return '${COLORS.goldLight}';
+      // Log scale for better distribution across wide ranges
+      var logCount = Math.log10(count + 1);
+      var logMax = Math.log10(MAX_COUNT + 1);
+      var ratio = logCount / logMax;
+      if (ratio > 0.9) return '#5B1A2A';
+      if (ratio > 0.78) return '#7B2D3F';
+      if (ratio > 0.66) return '#9B3F54';
+      if (ratio > 0.54) return '#B85C6F';
+      if (ratio > 0.42) return '#D4848F';
+      if (ratio > 0.30) return '#E8A8AA';
+      if (ratio > 0.18) return '#F2C8C4';
+      return '#F9E0DB';
     }
 
     function featureStyle(feature) {
