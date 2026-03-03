@@ -1,56 +1,43 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Tabs, useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, SPACING } from '@/constants/theme';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, VIP_COLORS } from '@/constants/theme';
 import { useTranslation } from '@/i18n';
-import Logo from '@/components/Logo';
-
-function HeaderLogo() {
-  const router = useRouter();
-  return (
-    <Pressable onPress={() => router.replace('/')} style={styles.headerLogoRow}>
-      <Logo size={28} color={COLORS.cream} accentColor={COLORS.gold} />
-      <Text style={styles.headerLogoText}>SAQ Futé</Text>
-    </Pressable>
-  );
-}
-
-function HeaderRight() {
-  const router = useRouter();
-  return (
-    <View style={styles.headerRightRow}>
-      <Pressable onPress={() => router.push('/cellar')} style={styles.headerBtn} hitSlop={12}>
-        <MaterialCommunityIcons name="bottle-wine-outline" size={22} color={COLORS.white} />
-      </Pressable>
-      <Pressable onPress={() => router.push('/wishlist')} style={styles.headerBtn} hitSlop={12}>
-        <Ionicons name="bookmark-outline" size={21} color={COLORS.white} />
-      </Pressable>
-      <Pressable onPress={() => router.push('/map')} style={styles.headerBtn} hitSlop={12}>
-        <Ionicons name="map-outline" size={21} color={COLORS.white} />
-      </Pressable>
-      <Pressable onPress={() => router.push('/settings')} style={styles.headerBtn} hitSlop={12}>
-        <Ionicons name="settings-outline" size={22} color={COLORS.white} />
-      </Pressable>
-    </View>
-  );
-}
+import { useSettings } from '@/context/SettingsContext';
+import { useIsDark, useThemeColors } from '@/hooks/useThemeColors';
+import HeaderLogo from '@/components/HeaderLogo';
+import HeaderIcons from '@/components/HeaderIcons';
 
 export default function TabLayout() {
   const t = useTranslation();
+  const { vipMode } = useSettings();
+  const isDark = useIsDark();
+  const colors = useThemeColors();
+
+  const getTabBarStyle = () => {
+    if (vipMode) return { backgroundColor: VIP_COLORS.bg, borderTopColor: VIP_COLORS.border };
+    if (isDark) return { backgroundColor: colors.cream, borderTopColor: colors.grayLight };
+    return { backgroundColor: COLORS.cream, borderTopColor: COLORS.grayLight };
+  };
+
+  const getHeaderBg = () => {
+    if (vipMode) return VIP_COLORS.bg;
+    if (isDark) return colors.creamDark;
+    return COLORS.burgundy;
+  };
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: COLORS.burgundy,
-        tabBarInactiveTintColor: COLORS.gray,
-        tabBarStyle: { backgroundColor: COLORS.cream, borderTopColor: COLORS.grayLight },
-        headerStyle: { backgroundColor: COLORS.burgundy },
-        headerTintColor: COLORS.white,
+        tabBarActiveTintColor: vipMode ? VIP_COLORS.active : (isDark ? '#D08090' : COLORS.burgundy),
+        tabBarInactiveTintColor: vipMode ? VIP_COLORS.inactive : COLORS.gray,
+        tabBarStyle: getTabBarStyle(),
+        headerStyle: { backgroundColor: getHeaderBg() },
+        headerTintColor: vipMode ? COLORS.gold : (isDark ? '#F5F5F5' : COLORS.white),
         headerTitleStyle: { fontWeight: '700' },
         headerTitle: '',
         headerLeft: () => <HeaderLogo />,
-        headerRight: () => <HeaderRight />,
+        headerRight: () => <HeaderIcons />,
       }}
     >
       <Tabs.Screen
@@ -88,30 +75,12 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="heart" size={size} color={color} />,
         }}
       />
+      {/* Hidden tabs — keep tab bar visible on these screens */}
+      <Tabs.Screen name="cellar" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.cellar.title} /> }} />
+      <Tabs.Screen name="wishlist" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.wishlist.title} /> }} />
+      <Tabs.Screen name="map" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.map.title} /> }} />
+      <Tabs.Screen name="settings" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.settings.title} /> }} />
     </Tabs>
   );
 }
 
-const styles = StyleSheet.create({
-  headerLogoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingLeft: SPACING.sm,
-  },
-  headerLogoText: {
-    color: COLORS.cream,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  headerRightRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingRight: SPACING.sm,
-  },
-  headerBtn: {
-    padding: 8,
-  },
-});

@@ -1,10 +1,11 @@
 import React, { useRef, useEffect } from 'react';
 import { Platform, View, StyleSheet } from 'react-native';
-import { SAQ_TO_GEOJSON, GEOJSON_TO_SAQ } from '@/constants/countryMapping';
-import { COLORS } from '@/constants/theme';
+import { SAQ_TO_GEOJSON } from '@/constants/countryMapping';
+import { useThemeColors, useIsDark } from '@/hooks/useThemeColors';
 
 export interface RegionData {
   country: string;
+  totalCount: number;
   regions: { name: string; count: number; appellations: string[] }[];
 }
 
@@ -36,12 +37,27 @@ const COUNTRY_FLAGS: Record<string, string> = {
   Liban: '\u{1F1F1}\u{1F1E7}', Israël: '\u{1F1EE}\u{1F1F1}', Géorgie: '\u{1F1EC}\u{1F1EA}', Uruguay: '\u{1F1FA}\u{1F1FE}',
 };
 
+interface ThemeColors {
+  cream: string;
+  white: string;
+  black: string;
+  gray: string;
+  grayLight: string;
+  burgundy: string;
+}
+
 function generateLeafletHTML(
   countryData: { geoName: string; saqName: string; count: number }[],
   wineLabel: string,
   t: { backToWorld: string; seeAllWines: string; loadingRegions: string; noRegions: string; wines: string; regions: string; mapLoading: string; mapError: string },
+  themeColors: ThemeColors,
+  isDark: boolean,
 ): string {
   const maxCount = Math.max(...countryData.map((c) => c.count), 1);
+  const c = themeColors;
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 
   return `<!DOCTYPE html>
 <html>
@@ -52,27 +68,27 @@ function generateLeafletHTML(
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; }
-    #map { width: 100%; height: 100%; background: ${COLORS.cream}; }
+    #map { width: 100%; height: 100%; background: ${c.cream}; }
     .country-tooltip {
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 14px;
       font-weight: 600;
       padding: 6px 12px;
       border-radius: 8px;
-      background: white;
+      background: ${c.white};
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      border: 2px solid ${COLORS.burgundy};
-      color: ${COLORS.black};
+      border: 2px solid ${c.burgundy};
+      color: ${c.black};
     }
     .country-tooltip .count {
       font-size: 12px;
-      color: ${COLORS.gray};
+      color: ${c.gray};
       font-weight: 400;
     }
     .leaflet-control-attribution { font-size: 10px !important; opacity: 0.6; }
     #loading {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      font-family: -apple-system, sans-serif; font-size: 14px; color: ${COLORS.gray};
+      font-family: -apple-system, sans-serif; font-size: 14px; color: ${c.gray};
       z-index: 1000;
     }
     #back-btn {
@@ -81,18 +97,18 @@ function generateLeafletHTML(
       top: 10px;
       left: 55px;
       z-index: 1000;
-      background: white;
+      background: ${c.white};
       border: none;
       border-radius: 8px;
       padding: 8px 14px;
       font-size: 13px;
       font-weight: 600;
-      color: ${COLORS.burgundy};
+      color: ${c.burgundy};
       cursor: pointer;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    #back-btn:hover { background: ${COLORS.cream}; }
+    #back-btn:hover { background: ${c.cream}; }
     #region-overlay {
       display: none;
       position: absolute;
@@ -100,7 +116,7 @@ function generateLeafletHTML(
       right: 10px;
       width: min(280px, 75vw);
       max-height: calc(100% - 24px);
-      background: white;
+      background: ${c.white};
       border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.18);
       z-index: 1000;
@@ -111,16 +127,16 @@ function generateLeafletHTML(
     }
     .overlay-header {
       padding: 14px 16px 6px;
-      border-bottom: 1px solid #E5E5EA;
+      border-bottom: 1px solid ${c.grayLight};
     }
     .overlay-title {
       font-size: 16px;
       font-weight: 700;
-      color: ${COLORS.black};
+      color: ${c.black};
     }
     .overlay-subtitle {
       font-size: 12px;
-      color: ${COLORS.gray};
+      color: ${c.gray};
       padding: 4px 16px 8px;
     }
     .region-list {
@@ -135,27 +151,27 @@ function generateLeafletHTML(
       padding: 10px 16px;
       cursor: pointer;
       transition: background 0.15s;
-      border-bottom: 1px solid #F2F2F7;
+      border-bottom: 1px solid ${c.grayLight};
     }
     .region-item:last-child { border-bottom: none; }
-    .region-item:hover { background: ${COLORS.cream}; }
+    .region-item:hover { background: ${c.cream}; }
     .region-name {
       font-size: 14px;
       font-weight: 500;
-      color: ${COLORS.black};
+      color: ${c.black};
       flex: 1;
       line-height: 1.3;
     }
     .region-count {
       font-size: 13px;
       font-weight: 700;
-      color: ${COLORS.burgundy};
+      color: ${c.burgundy};
       margin-left: 8px;
       white-space: nowrap;
     }
     .region-appellations {
       font-size: 11px;
-      color: ${COLORS.gray};
+      color: ${c.gray};
       margin-top: 2px;
       line-height: 1.3;
     }
@@ -165,8 +181,8 @@ function generateLeafletHTML(
       padding: 12px 16px;
       font-size: 14px;
       font-weight: 600;
-      color: white;
-      background: ${COLORS.burgundy};
+      color: #FFFFFF;
+      background: ${c.burgundy};
       border: none;
       cursor: pointer;
       width: 100%;
@@ -177,7 +193,7 @@ function generateLeafletHTML(
       padding: 30px 16px;
       text-align: center;
       font-size: 13px;
-      color: ${COLORS.gray};
+      color: ${c.gray};
     }
   </style>
 </head>
@@ -225,7 +241,7 @@ function generateLeafletHTML(
       maxBoundsViscosity: 1.0,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('${tileUrl}', {
       attribution: '\\u00a9 OpenStreetMap \\u00a9 CARTO',
       subdomains: 'abcd',
       maxZoom: 19,
@@ -261,7 +277,7 @@ function generateLeafletHTML(
         };
       }
       return {
-        fillColor: '${COLORS.grayLight}',
+        fillColor: '${c.grayLight}',
         weight: 1,
         opacity: 0.3,
         color: 'white',
@@ -325,10 +341,14 @@ function generateLeafletHTML(
         list.innerHTML = '<div class="region-loading">' + T_NO_REGIONS + '</div>';
         return;
       }
-      var totalWines = 0;
-      data.regions.forEach(function(r) { totalWines += r.count; });
+      // Use API totalCount (accurate) instead of summing fetched wines (truncated by limit)
+      var totalWines = data.totalCount || 0;
+      if (!totalWines) {
+        data.regions.forEach(function(r) { totalWines += r.count; });
+      }
       document.getElementById('overlay-subtitle').textContent =
         data.regions.length + ' ' + T_REGIONS + ' \\u00b7 ' + totalWines + ' ' + T_WINES;
+      document.getElementById('see-all-btn').textContent = T_SEE_ALL + ' (' + totalWines + ')';
 
       var html = '';
       data.regions.forEach(function(r) {
@@ -449,6 +469,8 @@ export default function LeafletMap({
   const iframeContainerRef = useRef<View>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
+  const colors = useThemeColors();
+  const isDark = useIsDark();
   const t = translations || DEFAULT_TRANSLATIONS;
 
   const countryDataForMap = countries
@@ -459,12 +481,21 @@ export default function LeafletMap({
       count: c.count,
     }));
 
-  const html = generateLeafletHTML(countryDataForMap, wineLabel, t);
+  const themeColors: ThemeColors = {
+    cream: colors.cream,
+    white: colors.white,
+    black: colors.black,
+    gray: colors.gray,
+    grayLight: colors.grayLight,
+    burgundy: colors.burgundy,
+  };
+
+  const html = generateLeafletHTML(countryDataForMap, wineLabel, t, themeColors, isDark);
 
   // Web: send region data to iframe when it changes
   useEffect(() => {
     if (Platform.OS !== 'web' || !regionData || !iframeRef.current) return;
-    const msg = JSON.stringify({ type: 'regionData', regions: regionData.regions });
+    const msg = JSON.stringify({ type: 'regionData', regions: regionData.regions, totalCount: regionData.totalCount });
     iframeRef.current.contentWindow?.postMessage(msg, '*');
   }, [regionData]);
 

@@ -21,7 +21,3 @@ export const SAQ_TO_GEOJSON: Record<string, string> = {
   Uruguay: 'Uruguay',
 };
 
-// Reverse mapping: GeoJSON name -> SAQ French name
-export const GEOJSON_TO_SAQ: Record<string, string> = Object.fromEntries(
-  Object.entries(SAQ_TO_GEOJSON).map(([saq, geo]) => [geo, saq]),
-);

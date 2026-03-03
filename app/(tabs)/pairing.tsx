@@ -4,8 +4,13 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { saqApi } from '@/services/api';
+import { apiCache } from '@/services/apiCache';
 import type { Wine } from '@/types/wine';
 import { useTranslation } from '@/i18n';
+import { useSettings } from '@/context/SettingsContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { hapticSelection } from '@/services/haptics';
+import VipBanner from '@/components/VipBanner';
 import SearchBar from '@/components/SearchBar';
 import WineCard from '@/components/WineCard';
 import LoadingState from '@/components/LoadingState';
@@ -43,11 +48,14 @@ const DISH_EMOJIS: Record<string, string> = {
 export default function PairingScreen() {
   const t = useTranslation();
   const router = useRouter();
+  const { vipMode } = useSettings();
+  const colors = useThemeColors();
   const [dish, setDish] = useState('');
   const [results, setResults] = useState<Wine[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [activeDish, setActiveDish] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   const dishLabels = t.pairing.dishes as Record<string, string>;
   const categoryLabels = t.pairing.categories as Record<string, string>;
@@ -55,26 +63,39 @@ export default function PairingScreen() {
   const searchPairing = useCallback(async (d: string) => {
     if (!d) return;
     setDish(d);
-    setLoading(true);
+
+    // Check cache BEFORE setting loading (avoids flash)
+    const cached = apiCache.getPairing(d, vipMode || undefined);
+    if (cached) {
+      setResults(cached.wines);
+      setHasSearched(true);
+      return;
+    }
+
     setHasSearched(true);
+    setLoading(true);
+    setError(false);
     try {
-      const data = await saqApi.pairing({ dish: d });
+      const data = await saqApi.pairing({ dish: d, vip: vipMode || undefined });
+      apiCache.setPairing(d, vipMode || undefined, data);
       setResults(data.wines);
     } catch {
       setResults([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [vipMode]);
 
   const handleDishPress = (key: string) => {
+    hapticSelection();
     setActiveDish(key);
     setDish(dishLabels[key] || key);
     searchPairing(key);
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.cream }]}>
       <View style={styles.topRow}>
         <View style={styles.searchBarWrap}>
           <SearchBar
@@ -84,36 +105,42 @@ export default function PairingScreen() {
             placeholder={t.pairing.placeholder}
           />
         </View>
-        <Pressable onPress={() => router.push('/menu-scan')} style={styles.menuScanBtn} hitSlop={8}>
-          <Ionicons name="camera-outline" size={22} color={COLORS.burgundy} />
+        <Pressable onPress={() => router.push('/menu-scan')} style={[styles.menuScanBtn, { backgroundColor: colors.white }]} hitSlop={8} accessibilityLabel={t.menuScan.scanMenu} accessibilityRole="button">
+          <Ionicons name="camera-outline" size={22} color={colors.burgundy} />
         </Pressable>
       </View>
 
       {!hasSearched && (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          {/* VIP banner */}
+          {vipMode && <VipBanner />}
+
           {/* Menu scan promo */}
-          <Pressable onPress={() => router.push('/menu-scan')} style={styles.menuBanner}>
-            <Ionicons name="restaurant-outline" size={20} color={COLORS.burgundy} />
+          <Pressable onPress={() => router.push('/menu-scan')} style={[styles.menuBanner, { backgroundColor: colors.white, borderColor: colors.burgundy + '20' }]}>
+            <Ionicons name="restaurant-outline" size={20} color={colors.burgundy} />
             <View style={styles.menuBannerText}>
-              <Text style={styles.menuBannerTitle}>{t.menuScan.scanMenu}</Text>
-              <Text style={styles.menuBannerSub}>{t.menuScan.title}</Text>
+              <Text style={[styles.menuBannerTitle, { color: colors.black }]}>{t.menuScan.scanMenu}</Text>
+              <Text style={[styles.menuBannerSub, { color: colors.gray }]}>{t.menuScan.title}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
+            <Ionicons name="chevron-forward" size={18} color={colors.gray} />
           </Pressable>
 
           {CATEGORIES.map((cat) => (
             <View key={cat} style={styles.categorySection}>
-              <Text style={styles.categoryTitle}>{categoryLabels[cat] || cat}</Text>
+              <Text style={[styles.categoryTitle, { color: colors.black }]}>{categoryLabels[cat] || cat}</Text>
               <View style={styles.grid}>
                 {CATEGORY_DISHES[cat].map((key) => (
                   <Pressable
                     key={key}
                     onPress={() => handleDishPress(key)}
-                    style={[styles.dishBtn, activeDish === key && styles.dishBtnActive]}
+                    style={[styles.dishBtn, { backgroundColor: colors.white, borderColor: colors.grayLight }, activeDish === key && { backgroundColor: colors.burgundy, borderColor: colors.burgundy }]}
+                    accessibilityLabel={dishLabels[key] || key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: activeDish === key }}
                   >
                     <Text style={styles.dishEmoji}>{DISH_EMOJIS[key] || '🍽️'}</Text>
                     <Text
-                      style={[styles.dishLabel, activeDish === key && styles.dishLabelActive]}
+                      style={[styles.dishLabel, { color: colors.grayDark }, activeDish === key && { color: '#FFFFFF' }]}
                       numberOfLines={1}
                     >
                       {dishLabels[key] || key}
@@ -130,13 +157,19 @@ export default function PairingScreen() {
       {loading && <LoadingState message={t.pairing.loading} />}
 
       {!loading && hasSearched && results.length === 0 && (
-        <EmptyState message={t.pairing.noMatch} submessage={t.pairing.noMatchSub} onRetry={() => { setHasSearched(false); setActiveDish(null); }} />
+        <EmptyState
+          icon={error ? 'cloud-offline-outline' : undefined}
+          message={error ? t.search.connectionError : t.pairing.noMatch}
+          submessage={error ? t.common.retry : t.pairing.noMatchSub}
+          onRetry={() => { if (error && activeDish) { searchPairing(activeDish); } else { setHasSearched(false); setActiveDish(null); setError(false); } }}
+        />
       )}
 
       {!loading && results.length > 0 && (
         <>
+          {vipMode && <VipBanner />}
           <Pressable onPress={() => { setHasSearched(false); setResults([]); setActiveDish(null); }} style={styles.backBtn}>
-            <Text style={styles.backText}>{t.pairing.changeDish}</Text>
+            <Text style={[styles.backText, { color: colors.burgundy }]}>{t.pairing.changeDish}</Text>
           </Pressable>
           <FlatList
             data={results}
@@ -151,7 +184,7 @@ export default function PairingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.cream },
+  container: { flex: 1 },
   scrollContent: { paddingBottom: SPACING.xl },
   topRow: {
     flexDirection: 'row',
@@ -165,20 +198,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   menuBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
     marginHorizontal: SPACING.md,
     marginBottom: SPACING.md,
     padding: SPACING.md,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.burgundy + '20',
   },
   menuBannerText: {
     flex: 1,
@@ -187,11 +217,9 @@ const styles = StyleSheet.create({
   menuBannerTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: COLORS.black,
   },
   menuBannerSub: {
     fontSize: 12,
-    color: COLORS.gray,
     marginTop: 1,
   },
   categorySection: {
@@ -200,7 +228,6 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: COLORS.black,
     paddingHorizontal: SPACING.md,
     marginBottom: SPACING.sm,
   },
@@ -213,19 +240,15 @@ const styles = StyleSheet.create({
   dishBtn: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.white,
     borderRadius: RADIUS.full,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: COLORS.grayLight,
   },
-  dishBtnActive: { backgroundColor: COLORS.burgundy, borderColor: COLORS.burgundy },
   dishEmoji: { fontSize: 18 },
-  dishLabel: { fontSize: 13, fontWeight: '600', color: COLORS.grayDark },
-  dishLabelActive: { color: COLORS.white },
+  dishLabel: { fontSize: 13, fontWeight: '600' },
   backBtn: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
-  backText: { color: COLORS.burgundy, fontWeight: '600', fontSize: 15 },
+  backText: { fontWeight: '600', fontSize: 15 },
   list: { paddingBottom: SPACING.xl },
 });

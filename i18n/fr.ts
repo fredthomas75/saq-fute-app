@@ -19,6 +19,12 @@ export const fr = {
     organic: '🌿 Bio',
     expertPick: '⭐ 90+',
     filters: 'Filtres',
+    trending: 'Tendances',
+    totalWines: 'vins au catalogue',
+    onSaleCount: 'en promo',
+    organicCount: 'bio',
+    topCountries: 'Pays populaires',
+    topGrapes: 'Cépages populaires',
   },
 
   deals: {
@@ -148,8 +154,6 @@ export const fr = {
     clearFavoritesSub: 'Supprimer tous les vins sauvegardés',
     clearFavoritesConfirm: 'Effacer les favoris ?',
     clearFavoritesConfirmMsg: 'Cette action est irréversible. Tous vos favoris seront supprimés.',
-    clearChat: 'Effacer le chat',
-    clearChatSub: "Supprimer l'historique de conversation",
     cancel: 'Annuler',
     confirm: 'Confirmer',
     about: 'À propos',
@@ -176,10 +180,17 @@ export const fr = {
     notes: 'Notes de dégustation',
     notesPlaceholder: 'Ajouter une note...',
     quantity: 'Quantité',
+    howMany: 'Combien de bouteilles ?',
+    add: 'Ajouter',
     clearCellar: 'Vider la cave',
     clearCellarSub: 'Supprimer tous les vins de la cave',
     clearCellarConfirm: 'Vider la cave ?',
     clearCellarConfirmMsg: 'Cette action est irréversible.',
+    statistics: 'Statistiques',
+    export: 'Exporter',
+    avgPrice: 'Prix moyen',
+    byType: 'Par type',
+    byCountry: 'Par pays',
   },
 
   camera: {
@@ -258,6 +269,8 @@ export const fr = {
     addedToCellar: 'Ajouté à la cave',
     noteSaved: 'Note sauvegardée',
     back: 'Retour',
+    offline: 'Mode hors-ligne — données locales uniquement',
+    backOnline: 'Connexion rétablie',
   },
 
   wineTypes: {
@@ -278,6 +291,10 @@ export const fr = {
     emptySub: 'Ajoutez des vins que vous aimeriez goûter',
     add: 'À essayer',
     inList: 'Dans ma liste',
+    clearWishlist: 'Vider la liste à essayer',
+    clearWishlistSub: 'Supprimer tous les vins de la liste',
+    clearWishlistConfirm: 'Vider la liste ?',
+    clearWishlistConfirmMsg: 'Cette action est irréversible.',
   },
 
   wineNotes: {
@@ -306,6 +323,7 @@ export const fr = {
     wishlistRemoved: 'Retiré de la liste',
     cellarAdded: '🍷 Ajouté à la cave',
     noteSaved: '📝 Note sauvegardée',
+    syncError: '⚠️ Erreur de synchronisation',
   },
 
   filters: {
@@ -320,5 +338,52 @@ export const fr = {
     expertPick: 'Note 90+',
     apply: 'Appliquer',
     reset: 'Réinitialiser',
+  },
+
+  vip: {
+    sectionTitle: 'Mode VIP',
+    title: 'Mode VIP',
+    description: 'Affiche uniquement les vins notés 90+ par les experts',
+    bannerActive: 'Mode VIP — Vins notés 90+',
+    fallbackNote: 'Pas assez de vins VIP 90+ — résultats standards inclus',
+  },
+
+  compare: {
+    title: 'Comparer',
+    wine1: 'Premier vin...',
+    wine2: 'Deuxième vin...',
+    button: 'Comparer',
+    loading: 'Comparaison en cours...',
+    verdict: 'Verdict',
+    vs: 'VS',
+    empty: 'Compare deux vins',
+    emptySub: 'Tape le nom de deux vins pour voir lequel est le meilleur rapport qualité-prix',
+  },
+
+  // Noms de pays — identité en français (l'API retourne les noms FR)
+  countries: {
+    France: 'France', Italie: 'Italie', Espagne: 'Espagne', Portugal: 'Portugal',
+    Argentine: 'Argentine', Chili: 'Chili', 'États-Unis': 'États-Unis',
+    Australie: 'Australie', 'Nouvelle-Zélande': 'Nouvelle-Zélande',
+    'Afrique du Sud': 'Afrique du Sud', Allemagne: 'Allemagne', Canada: 'Canada',
+    Grèce: 'Grèce', Hongrie: 'Hongrie', Autriche: 'Autriche', Liban: 'Liban',
+    Israël: 'Israël', Géorgie: 'Géorgie', Uruguay: 'Uruguay', Mexique: 'Mexique',
+    Brésil: 'Brésil', Bulgarie: 'Bulgarie', Croatie: 'Croatie', Roumanie: 'Roumanie',
+    Moldavie: 'Moldavie', Maroc: 'Maroc', Tunisie: 'Tunisie', Suisse: 'Suisse',
+    Angleterre: 'Angleterre', Chine: 'Chine', Japon: 'Japon', Turquie: 'Turquie',
+    Inde: 'Inde',
+  } as Record<string, string>,
+
+  auth: {
+    sectionTitle: 'Compte',
+    signInDescription: 'Connectez-vous pour synchroniser vos données entre appareils',
+    signInWithGoogle: 'Continuer avec Google',
+    signInWithApple: 'Continuer avec Apple',
+    signedInAs: 'Connecté en tant que',
+    signOut: 'Déconnexion',
+    signOutConfirm: 'Se déconnecter ?',
+    signOutConfirmMsg: 'Vos données seront conservées localement sur cet appareil.',
+    syncNow: 'Synchroniser',
+    syncing: 'Synchronisation...',
   },
 };

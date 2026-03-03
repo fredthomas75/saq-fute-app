@@ -14,8 +14,13 @@ import { CellarProvider } from '@/context/CellarContext';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { WineNotesProvider } from '@/context/WineNotesContext';
 import { ToastProvider } from '@/context/ToastContext';
+import { AuthProvider } from '@/context/AuthContext';
 import { COLORS } from '@/constants/theme';
+import { useThemeColors, useIsDark } from '@/hooks/useThemeColors';
 import { useTranslation } from '@/i18n';
+import OfflineBanner from '@/components/OfflineBanner';
+import ErrorBoundaryScreen from '@/components/ErrorBoundaryScreen';
+import HeaderIcons from '@/components/HeaderIcons';
 import 'react-native-reanimated';
 
 export { ErrorBoundary } from 'expo-router';
@@ -28,28 +33,32 @@ SplashScreen.preventAutoHideAsync();
 
 function StackNavigator() {
   const t = useTranslation();
+  const colors = useThemeColors();
+  const isDark = useIsDark();
 
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: COLORS.burgundy },
-        headerTintColor: COLORS.white,
+        headerStyle: { backgroundColor: isDark ? colors.creamDark : COLORS.burgundy },
+        headerTintColor: isDark ? '#F5F5F5' : '#FFFFFF',
         headerTitleStyle: { fontWeight: '700' },
         headerBackTitle: t.common.back,
+        headerRight: () => <HeaderIcons />,
+        animation: 'slide_from_right',
+        animationDuration: 250,
+        contentStyle: { backgroundColor: colors.cream },
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false, headerBackTitle: t.common.back }} />
       <Stack.Screen name="wine/[id]" options={{ title: t.wineDetail.title }} />
-      <Stack.Screen name="settings" options={{ title: t.settings.title }} />
-      <Stack.Screen name="cellar" options={{ title: t.cellar.title }} />
       <Stack.Screen name="camera" options={{ title: t.camera.title, headerShown: false }} />
       <Stack.Screen name="menu-scan" options={{ title: t.menuScan.title }} />
-      <Stack.Screen name="map" options={{ title: t.map.title }} />
       <Stack.Screen name="country-wines" options={{ title: t.map.wines }} />
       <Stack.Screen name="coups-de-coeur" options={{ title: t.deals.coupDeCoeur }} />
       <Stack.Screen name="en-promo" options={{ title: t.deals.onSale }} />
-      <Stack.Screen name="wishlist" options={{ title: t.wishlist.title }} />
+      <Stack.Screen name="compare" options={{ title: t.compare.title }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -74,20 +83,25 @@ export default function RootLayout() {
 
   return (
     <SettingsProvider>
-      <FavoritesProvider>
-        <SearchHistoryProvider>
-          <CellarProvider>
-            <WishlistProvider>
-            <WineNotesProvider>
-            <ToastProvider>
-              <StatusBar style="light" />
-              <StackNavigator />
-            </ToastProvider>
-            </WineNotesProvider>
-            </WishlistProvider>
-          </CellarProvider>
-        </SearchHistoryProvider>
-      </FavoritesProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <FavoritesProvider>
+            <SearchHistoryProvider>
+              <CellarProvider>
+                <WishlistProvider>
+                <WineNotesProvider>
+                  <ErrorBoundaryScreen>
+                    <StatusBar style="light" />
+                    <OfflineBanner />
+                    <StackNavigator />
+                  </ErrorBoundaryScreen>
+                </WineNotesProvider>
+                </WishlistProvider>
+              </CellarProvider>
+            </SearchHistoryProvider>
+          </FavoritesProvider>
+        </ToastProvider>
+      </AuthProvider>
     </SettingsProvider>
   );
 }

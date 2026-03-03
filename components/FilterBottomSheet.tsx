@@ -2,15 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Pressable, Animated, Modal, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { TYPE_COLORS } from '@/constants/wine';
 import { useTranslation } from '@/i18n';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 const WINE_TYPE_KEYS = ['Rouge', 'Blanc', 'Rosé', 'Mousseux'];
-const TYPE_COLORS: Record<string, string> = {
-  Rouge: '#722F37',
-  Blanc: '#C5A572',
-  Rosé: '#E8A0BF',
-  Mousseux: '#7FB3D8',
-};
 
 export interface FilterState {
   type?: string;
@@ -30,6 +26,7 @@ interface Props {
 
 export default function FilterBottomSheet({ visible, onClose, onApply, initialFilters }: Props) {
   const t = useTranslation();
+  const colors = useThemeColors();
   const { height: screenHeight } = useWindowDimensions();
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const slideAnim = useRef(new Animated.Value(screenHeight)).current;
@@ -53,7 +50,15 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
   }, [visible, screenHeight, slideAnim, initialFilters]);
 
   const handleApply = () => {
-    onApply(filters);
+    // Auto-swap if min > max
+    const corrected = { ...filters };
+    if (corrected.priceMin && corrected.priceMax && corrected.priceMin > corrected.priceMax) {
+      const tmp = corrected.priceMin;
+      corrected.priceMin = corrected.priceMax;
+      corrected.priceMax = tmp;
+      setFilters(corrected);
+    }
+    onApply(corrected);
     onClose();
   };
 
@@ -78,22 +83,22 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+      <Animated.View style={[styles.sheet, { backgroundColor: colors.white, transform: [{ translateY: slideAnim }] }]}>
         {/* Handle */}
-        <View style={styles.handle} />
+        <View style={[styles.handle, { backgroundColor: colors.grayLight }]} />
 
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t.filters.title}</Text>
+          <Text style={[styles.headerTitle, { color: colors.black }]}>{t.filters.title}</Text>
           {activeCount > 0 && (
             <Pressable onPress={handleReset} hitSlop={8}>
-              <Text style={styles.resetText}>{t.filters.reset}</Text>
+              <Text style={[styles.resetText, { color: colors.burgundy }]}>{t.filters.reset}</Text>
             </Pressable>
           )}
         </View>
 
         {/* Wine type */}
-        <Text style={styles.sectionLabel}>{t.filters.type}</Text>
+        <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.type}</Text>
         <View style={styles.typeRow}>
           {WINE_TYPE_KEYS.map((type) => {
             const isActive = filters.type === type;
@@ -102,59 +107,67 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
               <Pressable
                 key={type}
                 onPress={() => setFilters((f) => ({ ...f, type: f.type === type ? undefined : type }))}
-                style={[styles.typeChip, isActive && { backgroundColor: TYPE_COLORS[type], borderColor: TYPE_COLORS[type] }]}
+                style={[styles.typeChip, { backgroundColor: colors.cream, borderColor: colors.grayLight }, isActive && { backgroundColor: TYPE_COLORS[type], borderColor: TYPE_COLORS[type] }]}
               >
-                <Text style={[styles.typeChipText, isActive && { color: COLORS.white }]}>{label}</Text>
+                <Text style={[styles.typeChipText, { color: colors.grayDark }, isActive && { color: '#FFFFFF' }]}>{label}</Text>
               </Pressable>
             );
           })}
         </View>
 
         {/* Price range */}
-        <Text style={styles.sectionLabel}>{t.filters.priceRange}</Text>
+        <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.priceRange}</Text>
         <View style={styles.priceRow}>
           <TextInput
-            style={styles.priceInput}
+            style={[styles.priceInput, { borderColor: colors.grayLight, color: colors.black, backgroundColor: colors.cream }]}
             placeholder={t.filters.minPrice}
-            placeholderTextColor={COLORS.gray}
+            placeholderTextColor={colors.grayLight}
             keyboardType="numeric"
             value={filters.priceMin ? String(filters.priceMin) : ''}
             onChangeText={(v) => setFilters((f) => ({ ...f, priceMin: v ? Number(v) : undefined }))}
+            accessibilityLabel={t.filters.minPrice}
           />
-          <Text style={styles.priceSep}>—</Text>
+          <Text style={[styles.priceSep, { color: colors.gray }]}>—</Text>
           <TextInput
-            style={styles.priceInput}
+            style={[styles.priceInput, { borderColor: colors.grayLight, color: colors.black, backgroundColor: colors.cream }]}
             placeholder={t.filters.maxPrice}
-            placeholderTextColor={COLORS.gray}
+            placeholderTextColor={colors.grayLight}
             keyboardType="numeric"
             value={filters.priceMax ? String(filters.priceMax) : ''}
             onChangeText={(v) => setFilters((f) => ({ ...f, priceMax: v ? Number(v) : undefined }))}
+            accessibilityLabel={t.filters.maxPrice}
           />
         </View>
 
         {/* Toggle options */}
-        <Text style={styles.sectionLabel}>{t.filters.options}</Text>
+        <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.options}</Text>
         <View style={styles.toggleList}>
           <ToggleRow
             label={`🏷️ ${t.filters.onSale}`}
             active={filters.onlySale}
             onToggle={() => setFilters((f) => ({ ...f, onlySale: !f.onlySale }))}
+            textColor={colors.black}
+            trackColor={colors.grayLight}
           />
           <ToggleRow
             label={`🌿 ${t.filters.organic}`}
             active={filters.onlyOrganic}
             onToggle={() => setFilters((f) => ({ ...f, onlyOrganic: !f.onlyOrganic }))}
+            textColor={colors.black}
+            trackColor={colors.grayLight}
           />
           <ToggleRow
             label={`⭐ ${t.filters.expertPick}`}
             active={filters.onlyExpert}
             onToggle={() => setFilters((f) => ({ ...f, onlyExpert: !f.onlyExpert }))}
+            textColor={colors.black}
+            trackColor={colors.grayLight}
           />
         </View>
 
         {/* Apply button */}
         <Pressable onPress={handleApply} style={styles.applyBtn}>
-          <Ionicons name="checkmark" size={20} color={COLORS.white} />
+          <Ionicons name="checkmark" size={20} color="#FFFFFF" />
           <Text style={styles.applyText}>{t.filters.apply}</Text>
         </Pressable>
       </Animated.View>
@@ -162,11 +175,11 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
   );
 }
 
-function ToggleRow({ label, active, onToggle }: { label: string; active: boolean; onToggle: () => void }) {
+function ToggleRow({ label, active, onToggle, textColor, trackColor }: { label: string; active: boolean; onToggle: () => void; textColor?: string; trackColor?: string }) {
   return (
-    <Pressable onPress={onToggle} style={styles.toggleRow}>
-      <Text style={styles.toggleLabel}>{label}</Text>
-      <View style={[styles.toggle, active && styles.toggleActive]}>
+    <Pressable onPress={onToggle} style={styles.toggleRow} accessibilityLabel={label} accessibilityRole="switch" accessibilityState={{ checked: active }}>
+      <Text style={[styles.toggleLabel, textColor ? { color: textColor } : undefined]}>{label}</Text>
+      <View style={[styles.toggle, trackColor ? { backgroundColor: trackColor } : undefined, active && styles.toggleActive]}>
         <View style={[styles.toggleDot, active && styles.toggleDotActive]} />
       </View>
     </Pressable>
@@ -183,7 +196,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: SPACING.lg,
@@ -193,7 +205,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: COLORS.grayLight,
     alignSelf: 'center',
     marginTop: SPACING.sm,
     marginBottom: SPACING.md,
@@ -207,17 +218,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: COLORS.black,
   },
   resetText: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.burgundy,
   },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.gray,
     marginBottom: SPACING.sm,
     marginTop: SPACING.sm,
   },
@@ -231,13 +239,10 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
-    borderColor: COLORS.grayLight,
-    backgroundColor: COLORS.cream,
   },
   typeChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.grayDark,
   },
   priceRow: {
     flexDirection: 'row',
@@ -247,17 +252,14 @@ const styles = StyleSheet.create({
   priceInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: COLORS.grayLight,
     borderRadius: RADIUS.sm,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.sm,
     fontSize: 15,
-    color: COLORS.black,
     textAlign: 'center',
   },
   priceSep: {
     fontSize: 16,
-    color: COLORS.gray,
   },
   toggleList: {
     gap: 2,
@@ -270,13 +272,11 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 15,
-    color: COLORS.black,
   },
   toggle: {
     width: 44,
     height: 26,
     borderRadius: 13,
-    backgroundColor: COLORS.grayLight,
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
   },
   toggleDotActive: {
     alignSelf: 'flex-end',
@@ -305,6 +305,6 @@ const styles = StyleSheet.create({
   applyText: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#FFFFFF',
   },
 });

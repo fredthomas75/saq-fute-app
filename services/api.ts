@@ -11,6 +11,10 @@ import type {
   SearchParams,
 } from '@/types/wine';
 
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [500, 1500, 3000]; // ms
+const API_TIMEOUT_MS = 15000; // 15s per request
+
 async function apiCall<T>(params: Record<string, string | number | boolean | undefined>): Promise<T> {
   const url = new URL('/api/saq', API_BASE_URL);
   Object.entries(params).forEach(([key, value]) => {
@@ -19,11 +23,37 @@ async function apiCall<T>(params: Record<string, string | number | boolean | und
     }
   });
 
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`Erreur API: ${response.status}`);
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+      const response = await fetch(url.toString(), { signal: controller.signal }).finally(() => clearTimeout(timer));
+      if (!response.ok) {
+        const err = new Error(`Erreur API: ${response.status}`);
+        (err as any).status = response.status;
+        throw err;
+      }
+      const data = await response.json();
+      return data as T;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry client errors (4xx) — they won't self-heal
+      const status = (lastError as any).status;
+      if (typeof status === 'number' && status >= 400 && status < 500) {
+        throw lastError;
+      }
+
+      // If we have retries left, wait with exponential backoff
+      if (attempt < MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[attempt]));
+      }
+    }
   }
-  return response.json();
+
+  throw lastError!;
 }
 
 export const saqApi = {

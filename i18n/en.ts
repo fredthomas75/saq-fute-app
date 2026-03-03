@@ -21,6 +21,12 @@ export const en: typeof fr = {
     organic: '🌿 Organic',
     expertPick: '⭐ 90+',
     filters: 'Filters',
+    trending: 'Trends',
+    totalWines: 'wines in catalog',
+    onSaleCount: 'on sale',
+    organicCount: 'organic',
+    topCountries: 'Popular countries',
+    topGrapes: 'Popular grapes',
   },
 
   deals: {
@@ -150,8 +156,6 @@ export const en: typeof fr = {
     clearFavoritesSub: 'Remove all saved wines',
     clearFavoritesConfirm: 'Clear favorites?',
     clearFavoritesConfirmMsg: 'This action cannot be undone. All your favorites will be removed.',
-    clearChat: 'Clear chat',
-    clearChatSub: 'Delete conversation history',
     cancel: 'Cancel',
     confirm: 'Confirm',
     about: 'About',
@@ -178,10 +182,17 @@ export const en: typeof fr = {
     notes: 'Tasting notes',
     notesPlaceholder: 'Add a note...',
     quantity: 'Quantity',
+    howMany: 'How many bottles?',
+    add: 'Add',
     clearCellar: 'Clear cellar',
     clearCellarSub: 'Remove all wines from cellar',
     clearCellarConfirm: 'Clear cellar?',
     clearCellarConfirmMsg: 'This action cannot be undone.',
+    statistics: 'Statistics',
+    export: 'Export',
+    avgPrice: 'Avg. price',
+    byType: 'By type',
+    byCountry: 'By country',
   },
 
   camera: {
@@ -260,6 +271,8 @@ export const en: typeof fr = {
     addedToCellar: 'Added to cellar',
     noteSaved: 'Note saved',
     back: 'Back',
+    offline: 'Offline mode — local data only',
+    backOnline: 'Back online',
   },
 
   wineTypes: {
@@ -280,6 +293,10 @@ export const en: typeof fr = {
     emptySub: 'Add wines you\'d like to try',
     add: 'Want to try',
     inList: 'In my list',
+    clearWishlist: 'Clear wishlist',
+    clearWishlistSub: 'Remove all wines from wishlist',
+    clearWishlistConfirm: 'Clear wishlist?',
+    clearWishlistConfirmMsg: 'This action cannot be undone.',
   },
 
   wineNotes: {
@@ -308,6 +325,7 @@ export const en: typeof fr = {
     wishlistRemoved: 'Removed from list',
     cellarAdded: '🍷 Added to cellar',
     noteSaved: '📝 Note saved',
+    syncError: '⚠️ Sync error',
   },
 
   filters: {
@@ -322,5 +340,52 @@ export const en: typeof fr = {
     expertPick: 'Rating 90+',
     apply: 'Apply',
     reset: 'Reset',
+  },
+
+  vip: {
+    sectionTitle: 'VIP Mode',
+    title: 'VIP Mode',
+    description: 'Show only wines rated 90+ by experts',
+    bannerActive: 'VIP Mode — Expert rated 90+',
+    fallbackNote: 'Not enough VIP 90+ wines — standard results included',
+  },
+
+  compare: {
+    title: 'Compare',
+    wine1: 'First wine...',
+    wine2: 'Second wine...',
+    button: 'Compare',
+    loading: 'Comparing...',
+    verdict: 'Verdict',
+    vs: 'VS',
+    empty: 'Compare two wines',
+    emptySub: 'Enter the names of two wines to see which is the better value',
+  },
+
+  // Country names — translated from French API names to English
+  countries: {
+    France: 'France', Italie: 'Italy', Espagne: 'Spain', Portugal: 'Portugal',
+    Argentine: 'Argentina', Chili: 'Chile', 'États-Unis': 'United States',
+    Australie: 'Australia', 'Nouvelle-Zélande': 'New Zealand',
+    'Afrique du Sud': 'South Africa', Allemagne: 'Germany', Canada: 'Canada',
+    Grèce: 'Greece', Hongrie: 'Hungary', Autriche: 'Austria', Liban: 'Lebanon',
+    Israël: 'Israel', Géorgie: 'Georgia', Uruguay: 'Uruguay', Mexique: 'Mexico',
+    Brésil: 'Brazil', Bulgarie: 'Bulgaria', Croatie: 'Croatia', Roumanie: 'Romania',
+    Moldavie: 'Moldova', Maroc: 'Morocco', Tunisie: 'Tunisia', Suisse: 'Switzerland',
+    Angleterre: 'England', Chine: 'China', Japon: 'Japan', Turquie: 'Turkey',
+    Inde: 'India',
+  } as Record<string, string>,
+
+  auth: {
+    sectionTitle: 'Account',
+    signInDescription: 'Sign in to sync your data across devices',
+    signInWithGoogle: 'Continue with Google',
+    signInWithApple: 'Continue with Apple',
+    signedInAs: 'Signed in as',
+    signOut: 'Sign out',
+    signOutConfirm: 'Sign out?',
+    signOutConfirmMsg: 'Your data will be kept locally on this device.',
+    syncNow: 'Sync now',
+    syncing: 'Syncing...',
   },
 };

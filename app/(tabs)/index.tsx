@@ -1,69 +1,116 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { saqApi } from '@/services/api';
-import { searchCache } from '@/services/searchCache';
-import SearchCacheClass from '@/services/searchCache';
-import type { Wine } from '@/types/wine';
-import { useTranslation } from '@/i18n';
+import SearchCache, { searchCache } from '@/services/searchCache';
+import { apiCache } from '@/services/apiCache';
+import type { Wine, StatsResponse } from '@/types/wine';
+import { useTranslation, useTranslateCountry } from '@/i18n';
+import { useSettings } from '@/context/SettingsContext';
+import { hapticSelection } from '@/services/haptics';
 import { useSearchHistory } from '@/context/SearchHistoryContext';
 import SearchBar from '@/components/SearchBar';
+import VipBanner from '@/components/VipBanner';
 import WineCard from '@/components/WineCard';
+import AnimatedListItem from '@/components/AnimatedListItem';
 import EmptyState from '@/components/EmptyState';
 import SkeletonLoader from '@/components/SkeletonLoader';
 import FilterBottomSheet, { FilterState } from '@/components/FilterBottomSheet';
 
 const CARD_HEIGHT = 170;
+const PAGE_SIZE = 20;
 
 export default function SearchScreen() {
   const t = useTranslation();
+  const tc = useTranslateCountry();
+  const colors = useThemeColors();
   const router = useRouter();
+  const { vipMode } = useSettings();
   const { history, addEntry, removeEntry, clearHistory } = useSearchHistory();
   const params = useLocalSearchParams<{ query?: string }>();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>({ onlySale: false, onlyOrganic: false, onlyExpert: false });
   const [results, setResults] = useState<Wine[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [stats, setStats] = useState<StatsResponse | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryRef = useRef('');
+  const pageRef = useRef(0);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+  const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flatListRef = useRef<FlatList>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [vipFallback, setVipFallback] = useState(false);
+
+  // Cleanup search timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
+    };
+  }, []);
+
+  // Build a set of known country names from stats for smart detection
+  const knownCountries = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (stats?.topCountries) {
+      knownCountries.current = new Set(stats.topCountries.map((c) => c.country.toLowerCase()));
+    }
+  }, [stats]);
 
   const doSearch = useCallback(async (forceRefresh = false) => {
-    const searchParams: any = {
-      query: queryRef.current || undefined,
+    const q = queryRef.current?.trim() || '';
+    // If query matches a known country name, use the country param for exact filtering
+    const isCountrySearch = q.length >= 2 && knownCountries.current.has(q.toLowerCase());
+
+    const searchParams: Record<string, string | number | boolean | undefined> = {
+      query: isCountrySearch ? undefined : (q || undefined),
+      country: isCountrySearch ? q : undefined,
       type: filters.type,
       onlySale: filters.onlySale || undefined,
       onlyOrganic: filters.onlyOrganic || undefined,
-      vip: filters.onlyExpert || undefined,
-      limit: 20,
+      vip: filters.onlyExpert || vipMode || undefined,
+      minPrice: filters.priceMin || undefined,
+      maxPrice: filters.priceMax || undefined,
+      limit: PAGE_SIZE,
     };
 
     // Check cache first (unless forced refresh)
-    const cacheKey = SearchCacheClass.makeKey(searchParams);
+    const cacheKey = SearchCache.makeKey(searchParams);
     if (!forceRefresh) {
       const cached = searchCache.get(cacheKey);
       if (cached) {
         setResults(cached.wines);
+        setTotalCount(cached.count || cached.wines.length);
         setHasSearched(true);
         setLoading(false);
+        pageRef.current = 1;
         return;
       }
     }
 
     setLoading(true);
     setError(null);
+    pageRef.current = 0;
     try {
       const data = await saqApi.search(searchParams);
       setResults(data.wines);
+      setTotalCount(data.count || data.wines.length);
+      setVipFallback(!!data.vipFallback);
       setHasSearched(true);
+      pageRef.current = 1;
       searchCache.set(cacheKey, data);
       if (queryRef.current && queryRef.current.length >= 2) {
-        addEntry(queryRef.current, data.wines.length);
+        addEntry(queryRef.current, data.count || data.wines.length);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.error);
@@ -71,7 +118,54 @@ export default function SearchScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filters, t, addEntry]);
+  }, [filters, t, addEntry, vipMode]);
+
+  // Load more results (infinite scroll)
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loading) return;
+    if (results.length >= totalCount) return; // All results loaded
+    const offset = pageRef.current * PAGE_SIZE;
+
+    setLoadingMore(true);
+    setLoadMoreError(false);
+    try {
+      const q = queryRef.current?.trim() || '';
+      const isCountrySearch = q.length >= 2 && knownCountries.current.has(q.toLowerCase());
+
+      const searchParams: Record<string, string | number | boolean | undefined> = {
+        query: isCountrySearch ? undefined : (q || undefined),
+        country: isCountrySearch ? q : undefined,
+        type: filters.type,
+        onlySale: filters.onlySale || undefined,
+        onlyOrganic: filters.onlyOrganic || undefined,
+        vip: filters.onlyExpert || vipMode || undefined,
+        minPrice: filters.priceMin || undefined,
+        maxPrice: filters.priceMax || undefined,
+        limit: PAGE_SIZE,
+        offset,
+      };
+      const data = await saqApi.search(searchParams);
+      if (data.wines.length > 0) {
+        setResults((prev) => {
+          const ids = new Set(prev.map((w) => w.id));
+          const newWines = data.wines.filter((w: Wine) => !ids.has(w.id));
+          return [...prev, ...newWines];
+        });
+        pageRef.current++;
+      }
+    } catch {
+      setLoadMoreError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, loading, results.length, totalCount, filters, vipMode]);
+
+  // Fetch stats for trending section (cached 30 min)
+  useEffect(() => {
+    const cached = apiCache.getStats();
+    if (cached) { setStats(cached); return; }
+    saqApi.stats().then((data) => { apiCache.setStats(data); setStats(data); }).catch(() => {});
+  }, []);
 
   // Handle incoming query param from map country click
   useEffect(() => {
@@ -88,6 +182,13 @@ export default function SearchScreen() {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (text.length >= 2) {
       timerRef.current = setTimeout(() => doSearch(), 400);
+    } else if (text.length === 0) {
+      // User cleared the search → reset to trending/home state
+      setResults([]);
+      setTotalCount(0);
+      setHasSearched(false);
+      setError(null);
+      setVipFallback(false);
     }
   }, [doSearch]);
 
@@ -101,12 +202,13 @@ export default function SearchScreen() {
     // doSearch will re-run due to filters dependency
   }, []);
 
-  // Re-run search when filters change (if user has searched)
+  // Re-run search when filters or vipMode change (debounced to avoid rapid API calls)
   useEffect(() => {
-    if (hasSearched || filters.type || filters.onlySale || filters.onlyOrganic || filters.onlyExpert) {
-      doSearch();
+    if (hasSearched || filters.type || filters.onlySale || filters.onlyOrganic || filters.onlyExpert || vipMode) {
+      if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
+      filterDebounceRef.current = setTimeout(() => doSearch(), 300);
     }
-  }, [filters]);
+  }, [filters, vipMode]);
 
   const handleHistoryTap = (q: string) => {
     setQuery(q);
@@ -124,7 +226,7 @@ export default function SearchScreen() {
   }), []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.cream }]}>
       {/* Search row with filter button */}
       <View style={styles.searchRow}>
         <View style={styles.searchBarWrap}>
@@ -135,16 +237,16 @@ export default function SearchScreen() {
             placeholder={t.search.placeholder}
           />
         </View>
-        <Pressable onPress={() => setShowFilters(true)} style={styles.filterBtn} hitSlop={8}>
-          <Ionicons name="options-outline" size={22} color={COLORS.burgundy} />
+        <Pressable onPress={() => setShowFilters(true)} style={[styles.filterBtn, { backgroundColor: colors.white }]} hitSlop={8} accessibilityLabel={t.search.filters} accessibilityRole="button">
+          <Ionicons name="options-outline" size={22} color={colors.burgundy} />
           {activeFilterCount > 0 && (
             <View style={styles.filterBadge}>
               <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
             </View>
           )}
         </Pressable>
-        <Pressable onPress={() => router.push('/camera')} style={styles.scanBtn} hitSlop={8}>
-          <Ionicons name="scan-outline" size={22} color={COLORS.burgundy} />
+        <Pressable onPress={() => router.push('/camera')} style={[styles.scanBtn, { backgroundColor: colors.white }]} hitSlop={8} accessibilityLabel={t.camera.title} accessibilityRole="button">
+          <Ionicons name="scan-outline" size={22} color={colors.burgundy} />
         </Pressable>
       </View>
 
@@ -158,44 +260,55 @@ export default function SearchScreen() {
         {(['Rouge', 'Blanc', 'Rosé', 'Mousseux'] as const).map((type) => (
           <Pressable
             key={type}
-            onPress={() => setFilters((f) => ({ ...f, type: f.type === type ? undefined : type }))}
-            style={[styles.filterChip, filters.type === type && styles.filterChipActive]}
+            onPress={() => { hapticSelection(); setFilters((f) => ({ ...f, type: f.type === type ? undefined : type })); }}
+            style={[styles.filterChip, { backgroundColor: colors.white, borderColor: colors.grayLight }, filters.type === type && styles.filterChipActive]}
           >
-            <Text style={[styles.filterChipText, filters.type === type && styles.filterChipTextActive]}>
+            <Text style={[styles.filterChipText, { color: colors.grayDark }, filters.type === type && styles.filterChipTextActive]}>
               {t.wineTypes[type] || type}
             </Text>
           </Pressable>
         ))}
         <Pressable
-          onPress={() => setFilters((f) => ({ ...f, onlySale: !f.onlySale }))}
-          style={[styles.filterChip, filters.onlySale && styles.filterChipActive]}
+          onPress={() => { hapticSelection(); setFilters((f) => ({ ...f, onlySale: !f.onlySale })); }}
+          style={[styles.filterChip, { backgroundColor: colors.white, borderColor: colors.grayLight }, filters.onlySale && styles.filterChipActive]}
         >
-          <Text style={[styles.filterChipText, filters.onlySale && styles.filterChipTextActive]}>{t.search.promo}</Text>
+          <Text style={[styles.filterChipText, { color: colors.grayDark }, filters.onlySale && styles.filterChipTextActive]}>{t.search.promo}</Text>
         </Pressable>
         <Pressable
-          onPress={() => setFilters((f) => ({ ...f, onlyOrganic: !f.onlyOrganic }))}
-          style={[styles.filterChip, filters.onlyOrganic && styles.filterChipActive]}
+          onPress={() => { hapticSelection(); setFilters((f) => ({ ...f, onlyOrganic: !f.onlyOrganic })); }}
+          style={[styles.filterChip, { backgroundColor: colors.white, borderColor: colors.grayLight }, filters.onlyOrganic && styles.filterChipActive]}
         >
-          <Text style={[styles.filterChipText, filters.onlyOrganic && styles.filterChipTextActive]}>{t.search.organic}</Text>
+          <Text style={[styles.filterChipText, { color: colors.grayDark }, filters.onlyOrganic && styles.filterChipTextActive]}>{t.search.organic}</Text>
         </Pressable>
       </ScrollView>
+
+      {/* VIP mode banner */}
+      {vipMode && <VipBanner />}
+
+      {/* VIP fallback info */}
+      {vipFallback && hasSearched && !loading && (
+        <View style={styles.vipFallbackBanner}>
+          <Ionicons name="information-circle-outline" size={16} color={COLORS.orange} />
+          <Text style={styles.vipFallbackText}>{t.vip.fallbackNote}</Text>
+        </View>
+      )}
 
       {/* Search history */}
       {!hasSearched && history.length > 0 && (
         <View style={styles.historySection}>
           <View style={styles.historyHeader}>
-            <Text style={styles.historyTitle}>{t.searchHistory.title}</Text>
+            <Text style={[styles.historyTitle, { color: colors.gray }]}>{t.searchHistory.title}</Text>
             <Pressable onPress={clearHistory} hitSlop={8}>
-              <Text style={styles.historyClear}>{t.searchHistory.clear}</Text>
+              <Text style={[styles.historyClear, { color: colors.burgundy }]}>{t.searchHistory.clear}</Text>
             </Pressable>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyChips}>
             {history.map((item) => (
-              <Pressable key={item.query + item.timestamp} onPress={() => handleHistoryTap(item.query)} style={styles.historyChip}>
-                <Ionicons name="time-outline" size={14} color={COLORS.gray} />
-                <Text style={styles.historyChipText} numberOfLines={1}>{item.query}</Text>
+              <Pressable key={item.query + item.timestamp} onPress={() => handleHistoryTap(item.query)} style={[styles.historyChip, { backgroundColor: colors.white, borderColor: colors.grayLight }]}>
+                <Ionicons name="time-outline" size={14} color={colors.gray} />
+                <Text style={[styles.historyChipText, { color: colors.grayDark }]} numberOfLines={1}>{item.query}</Text>
                 <Pressable onPress={() => removeEntry(item.query)} hitSlop={8}>
-                  <Ionicons name="close" size={14} color={COLORS.grayLight} />
+                  <Ionicons name="close" size={14} color={colors.gray} />
                 </Pressable>
               </Pressable>
             ))}
@@ -212,24 +325,119 @@ export default function SearchScreen() {
         <EmptyState message={t.search.noResults} submessage={t.search.noResultsSub} />
       )}
 
-      {!loading && !error && !hasSearched && history.length === 0 && (
-        <EmptyState icon="search-outline" message={t.search.searchWine} submessage={t.search.searchWineSub} />
+      {!loading && !error && !hasSearched && (
+        <ScrollView style={styles.trendingScroll} showsVerticalScrollIndicator={false}>
+          {/* Show search prompt if no history */}
+          {history.length === 0 && (
+            <EmptyState icon="search-outline" message={t.search.searchWine} submessage={t.search.searchWineSub} />
+          )}
+
+          {/* Trending stats */}
+          {stats && (
+            <View style={styles.trendingSection}>
+              <Text style={[styles.trendingTitle, { color: colors.black }]}>
+                <Ionicons name="trending-up" size={16} color={colors.burgundy} /> {t.search.trending}
+              </Text>
+
+              {/* Quick stats row */}
+              <View style={styles.statsRow}>
+                <View style={[styles.statCard, { backgroundColor: colors.white }]}>
+                  <Text style={[styles.statNumber, { color: colors.burgundy }]}>{stats.total.toLocaleString()}</Text>
+                  <Text style={[styles.statLabel, { color: colors.gray }]}>{t.search.totalWines}</Text>
+                </View>
+                <View style={[styles.statCard, { backgroundColor: colors.white }]}>
+                  <Text style={[styles.statNumber, { color: COLORS.red }]}>{stats.onSale.toLocaleString()}</Text>
+                  <Text style={[styles.statLabel, { color: colors.gray }]}>{t.search.onSaleCount}</Text>
+                </View>
+                <View style={[styles.statCard, { backgroundColor: colors.white }]}>
+                  <Text style={[styles.statNumber, { color: COLORS.green }]}>{stats.organic.toLocaleString()}</Text>
+                  <Text style={[styles.statLabel, { color: colors.gray }]}>{t.search.organicCount}</Text>
+                </View>
+              </View>
+
+              {/* Top countries */}
+              <Text style={[styles.trendingSubtitle, { color: colors.black }]}>{t.search.topCountries}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingChips}>
+                {stats.topCountries.slice(0, 8).map((c) => (
+                  <Pressable
+                    key={c.country}
+                    onPress={() => { handleQueryChange(c.country); }}
+                    style={[styles.trendingChip, { backgroundColor: colors.white, borderColor: colors.grayLight }]}
+                  >
+                    <Text style={[styles.trendingChipText, { color: colors.black }]}>{tc(c.country)}</Text>
+                    <Text style={[styles.trendingChipCount, { color: colors.gray }]}>{c.count}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              {/* Top grapes */}
+              <Text style={[styles.trendingSubtitle, { color: colors.black }]}>{t.search.topGrapes}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingChips}>
+                {stats.topGrapes.slice(0, 8).map((g) => (
+                  <Pressable
+                    key={g.grape}
+                    onPress={() => { handleQueryChange(g.grape); }}
+                    style={[styles.trendingChip, { backgroundColor: colors.white, borderColor: colors.grayLight }]}
+                  >
+                    <Text style={[styles.trendingChipText, { color: colors.black }]}>🍇 {g.grape}</Text>
+                    <Text style={[styles.trendingChipCount, { color: colors.gray }]}>{g.count}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </ScrollView>
       )}
 
       {!loading && results.length > 0 && (
-        <FlatList
-          data={results}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <WineCard wine={item} />}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          getItemLayout={getItemLayout}
-          maxToRenderPerBatch={8}
-          windowSize={5}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.burgundy} />
-          }
-        />
+        <>
+          <FlatList
+            ref={flatListRef}
+            data={results}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => (
+              <AnimatedListItem index={index}>
+                <WineCard wine={item} />
+              </AnimatedListItem>
+            )}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            getItemLayout={getItemLayout}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.4}
+            onScroll={(e) => setShowScrollTop(e.nativeEvent.contentOffset.y > 600)}
+            scrollEventThrottle={200}
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={styles.loadingMore}>
+                  <ActivityIndicator size="small" color={colors.burgundy} />
+                  <Text style={[styles.loadingMoreText, { color: colors.gray }]}>{t.common.loading}</Text>
+                </View>
+              ) : loadMoreError ? (
+                <Pressable onPress={loadMore} style={styles.loadingMore}>
+                  <Ionicons name="refresh-outline" size={18} color={colors.burgundy} />
+                  <Text style={[styles.loadingMoreText, { color: colors.burgundy, fontWeight: '600' }]}>{t.common.retry}</Text>
+                </Pressable>
+              ) : results.length < totalCount ? (
+                <Text style={styles.loadingMoreText}>{results.length} / {totalCount}</Text>
+              ) : null
+            }
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.burgundy} />
+            }
+          />
+          {showScrollTop && (
+            <Pressable
+              onPress={() => { flatListRef.current?.scrollToOffset({ offset: 0, animated: true }); }}
+              style={styles.scrollTopFab}
+              accessibilityLabel="Scroll to top"
+            >
+              <Ionicons name="chevron-up" size={22} color={COLORS.white} />
+            </Pressable>
+          )}
+        </>
       )}
 
       {/* Bottom sheet filters */}
@@ -360,5 +568,112 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.grayDark,
     maxWidth: 120,
+  },
+  trendingScroll: {
+    flex: 1,
+  },
+  trendingSection: {
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.xl,
+  },
+  trendingTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: SPACING.md,
+  },
+  trendingSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  statCard: {
+    flex: 1,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    ...SHADOWS.card,
+  },
+  statNumber: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  trendingChips: {
+    gap: SPACING.sm,
+    paddingRight: SPACING.md,
+  },
+  trendingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.grayLight,
+    ...SHADOWS.card,
+  },
+  trendingChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  trendingChipCount: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  loadingMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.lg,
+  },
+  loadingMoreText: {
+    textAlign: 'center',
+    color: COLORS.gray,
+    fontSize: 13,
+    paddingVertical: SPACING.md,
+  },
+  vipFallbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs + 2,
+    backgroundColor: COLORS.orange + '15',
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.orange + '30',
+  },
+  vipFallbackText: {
+    fontSize: 12,
+    color: COLORS.orange,
+    fontWeight: '500',
+    flex: 1,
+  },
+  scrollTopFab: {
+    position: 'absolute',
+    bottom: SPACING.lg,
+    right: SPACING.md,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.burgundy,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.card,
+    elevation: 5,
   },
 });

@@ -21,6 +21,9 @@ class SearchCache<T = any> {
       this.cache.delete(key);
       return null;
     }
+    // LRU: move to end (most recently used)
+    this.cache.delete(key);
+    this.cache.set(key, entry);
     return entry.data;
   }
 

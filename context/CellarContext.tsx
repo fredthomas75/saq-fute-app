@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Wine } from '@/types/wine';
+import { useAuth, registerMergeCallback } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
+import { debouncedSync, pushCellar, deleteCellarCloud, clearCellarCloud, mergeCellar } from '@/services/sync';
 
 const STORAGE_KEY = '@saq_fute_cellar';
 
@@ -26,19 +29,21 @@ type Action =
   | { type: 'REMOVE'; wineId: string }
   | { type: 'UPDATE_QTY'; wineId: string; quantity: number }
   | { type: 'UPDATE_NOTES'; wineId: string; notes: string }
-  | { type: 'CLEAR' };
+  | { type: 'CLEAR' }
+  | { type: 'MERGE'; cellar: CellarWine[] };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'LOAD':
       return { cellar: action.cellar, loaded: true };
     case 'ADD': {
+      const qty = action.wine.quantity || 1;
       const existing = state.cellar.find((w) => w.wineId === action.wine.wineId);
       if (existing) {
         return {
           ...state,
           cellar: state.cellar.map((w) =>
-            w.wineId === action.wine.wineId ? { ...w, quantity: w.quantity + 1 } : w
+            w.wineId === action.wine.wineId ? { ...w, quantity: w.quantity + qty } : w
           ),
         };
       }
@@ -66,6 +71,8 @@ function reducer(state: State, action: Action): State {
       };
     case 'CLEAR':
       return { ...state, cellar: [] };
+    case 'MERGE':
+      return { ...state, cellar: action.cellar };
     default:
       return state;
   }
@@ -73,7 +80,7 @@ function reducer(state: State, action: Action): State {
 
 interface CellarContextValue {
   cellar: CellarWine[];
-  addToCellar: (wine: Wine) => void;
+  addToCellar: (wine: Wine, quantity?: number) => void;
   removeFromCellar: (wineId: string) => void;
   updateQuantity: (wineId: string, quantity: number) => void;
   updateNotes: (wineId: string, notes: string) => void;
@@ -99,6 +106,9 @@ const CellarContext = createContext<CellarContextValue>({
 
 export function CellarProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { cellar: [], loaded: false });
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const lastAction = useRef<string | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
@@ -112,7 +122,26 @@ export function CellarProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.cellar, state.loaded]);
 
-  const addToCellar = useCallback((wine: Wine) => {
+  // Cloud sync: push changes when authenticated
+  useEffect(() => {
+    if (state.loaded && user && lastAction.current !== 'MERGE') {
+      debouncedSync('cellar', () => pushCellar(user.id, state.cellar), 500, () => {
+        showToast('⚠️ Sync cave échouée');
+      });
+    }
+    lastAction.current = null;
+  }, [state.cellar, state.loaded, user, showToast]);
+
+  // Register merge callback for full sync on login
+  useEffect(() => {
+    return registerMergeCallback(async (userId) => {
+      const merged = await mergeCellar(userId, state.cellar);
+      lastAction.current = 'MERGE';
+      dispatch({ type: 'MERGE', cellar: merged });
+    });
+  }, [state.cellar]);
+
+  const addToCellar = useCallback((wine: Wine, quantity: number = 1) => {
     dispatch({
       type: 'ADD',
       wine: {
@@ -121,7 +150,7 @@ export function CellarProvider({ children }: { children: React.ReactNode }) {
         type: wine.type,
         price: wine.price,
         country: wine.country,
-        quantity: 1,
+        quantity,
         dateAdded: Date.now(),
       },
     });
@@ -129,7 +158,8 @@ export function CellarProvider({ children }: { children: React.ReactNode }) {
 
   const removeFromCellar = useCallback((wineId: string) => {
     dispatch({ type: 'REMOVE', wineId });
-  }, []);
+    if (user) deleteCellarCloud(user.id, wineId).catch(() => {});
+  }, [user]);
 
   const updateQuantity = useCallback((wineId: string, quantity: number) => {
     dispatch({ type: 'UPDATE_QTY', wineId, quantity });
@@ -161,7 +191,8 @@ export function CellarProvider({ children }: { children: React.ReactNode }) {
 
   const clearCellar = useCallback(() => {
     dispatch({ type: 'CLEAR' });
-  }, []);
+    if (user) clearCellarCloud(user.id).catch(() => {});
+  }, [user]);
 
   return (
     <CellarContext.Provider

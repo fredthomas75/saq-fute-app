@@ -16,6 +16,29 @@ export const COLORS = {
   orange: '#FF9500',
 };
 
+/** VIP mode accent colors */
+export const VIP_COLORS = {
+  bg: '#1E1408',
+  border: '#3D2A10',
+  active: '#E8C96D',
+  inactive: '#6B5530',
+  text: '#1E1408',
+};
+
+export const COLORS_DARK = {
+  ...COLORS,
+  cream: '#1C1C1E',
+  creamDark: '#2C2C2E',
+  white: '#2C2C2E',
+  black: '#F5F5F5',
+  gray: '#8E8E93',
+  grayLight: '#3A3A3C',
+  grayDark: '#EBEBF0',
+  burgundy: '#D4737D',
+  burgundyLight: '#E08890',
+  burgundyDark: '#C06068',
+};
+
 export const SPACING = {
   xs: 4,
   sm: 8,

@@ -3,36 +3,27 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
+import { TYPE_COLORS, COUNTRY_FLAGS } from '@/constants/wine';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useWineNotes } from '@/context/WineNotesContext';
 import { useToast } from '@/context/ToastContext';
-import { useTranslation } from '@/i18n';
+import { useTranslation, useTranslateCountry } from '@/i18n';
 import { hapticLight } from '@/services/haptics';
 import type { Wine } from '@/types/wine';
-
-const TYPE_COLORS: Record<string, string> = {
-  Rouge: '#722F37',
-  Blanc: '#C5A572',
-  Rosé: '#E8A0BF',
-  Mousseux: '#7FB3D8',
-};
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  France: '🇫🇷', Italie: '🇮🇹', Espagne: '🇪🇸', Portugal: '🇵🇹',
-  Argentine: '🇦🇷', Chili: '🇨🇱', 'États-Unis': '🇺🇸', Australie: '🇦🇺',
-  'Nouvelle-Zélande': '🇳🇿', 'Afrique du Sud': '🇿🇦', Allemagne: '🇩🇪',
-  Canada: '🇨🇦', Grèce: '🇬🇷', Hongrie: '🇭🇺', Autriche: '🇦🇹',
-};
+import DealBadge from '@/components/DealBadge';
 
 interface Props {
   wine: Wine;
   compact?: boolean;
 }
 
-export default function WineCard({ wine, compact }: Props) {
+function WineCard({ wine, compact }: Props) {
   const router = useRouter();
   const t = useTranslation();
+  const tc = useTranslateCountry();
+  const colors = useThemeColors();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const { getNote } = useWineNotes();
@@ -73,7 +64,7 @@ export default function WineCard({ wine, compact }: Props) {
 
   if (compact) {
     return (
-      <Pressable onPress={handlePress} style={styles.compactCard}>
+      <Pressable onPress={handlePress} style={[styles.compactCard, { backgroundColor: colors.white }]}>
         {/* Color accent bar */}
         <View style={[styles.compactAccent, { backgroundColor: typeColor }]} />
 
@@ -85,13 +76,18 @@ export default function WineCard({ wine, compact }: Props) {
             </View>
             {wine.onSale && <Text style={styles.compactSaleBadge}>{t.common.sale}</Text>}
             {wine.coeurBadge && <Text style={{ fontSize: 12 }}>❤️</Text>}
+            {wine.maxExpertScore && wine.maxExpertScore >= 90 && (
+              <View style={styles.expertBadgeCompact}>
+                <Text style={styles.expertBadgeCompactText}>{wine.maxExpertScore}</Text>
+              </View>
+            )}
           </View>
 
           {/* Name */}
-          <Text style={styles.compactName} numberOfLines={2}>{wine.name}</Text>
+          <Text style={[styles.compactName, { color: colors.black }]} numberOfLines={2}>{wine.name}</Text>
 
           {/* Country */}
-          <Text style={styles.compactCountry} numberOfLines={1}>{flag} {wine.country}</Text>
+          <Text style={styles.compactCountry} numberOfLines={1}>{flag} {tc(wine.country)}</Text>
 
           {/* User rating */}
           {userNote?.rating && userNote.rating > 0 && (
@@ -104,7 +100,7 @@ export default function WineCard({ wine, compact }: Props) {
 
           {/* Price row */}
           <View style={styles.compactPriceRow}>
-            <Text style={styles.compactPrice}>{wine.price?.toFixed(2)}$</Text>
+            <Text style={[styles.compactPrice, { color: colors.burgundy }]}>{wine.price?.toFixed(2)}$</Text>
             {wine.onSale && wine.originalPrice && (
               <Text style={styles.compactOriginalPrice}>{wine.originalPrice.toFixed(2)}$</Text>
             )}
@@ -115,7 +111,7 @@ export default function WineCard({ wine, compact }: Props) {
   }
 
   return (
-    <Pressable onPress={handlePress} style={styles.card}>
+    <Pressable onPress={handlePress} style={[styles.card, { backgroundColor: colors.white }]}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={[styles.typePill, { backgroundColor: typeColor }]}>
@@ -124,26 +120,32 @@ export default function WineCard({ wine, compact }: Props) {
           {wine.coeurBadge && <Text style={styles.coeurBadge}>❤️</Text>}
           {wine.isOrganic && <Text style={styles.organicBadge}>🌿</Text>}
           {wine.onSale && <Text style={styles.saleBadge}>{t.common.sale}</Text>}
+          {wine.maxExpertScore && wine.maxExpertScore >= 90 && (
+            <View style={styles.expertBadge}>
+              <Ionicons name="star" size={10} color={COLORS.white} />
+              <Text style={styles.expertBadgeText}>{wine.maxExpertScore}</Text>
+            </View>
+          )}
         </View>
         <View style={styles.headerActions}>
-          <Pressable onPress={toggleWish} hitSlop={8}>
+          <Pressable onPress={toggleWish} hitSlop={8} accessibilityLabel={wished ? t.wishlist.inList : t.wishlist.add} accessibilityRole="button" accessibilityState={{ selected: wished }}>
             <Ionicons name={wished ? 'bookmark' : 'bookmark-outline'} size={20} color={wished ? COLORS.gold : COLORS.gray} />
           </Pressable>
-          <Pressable onPress={toggleFav} hitSlop={8}>
+          <Pressable onPress={toggleFav} hitSlop={8} accessibilityLabel={fav ? t.wineDetail.remove : t.wineDetail.favorite} accessibilityRole="button" accessibilityState={{ selected: fav }}>
             <Ionicons name={fav ? 'heart' : 'heart-outline'} size={24} color={fav ? COLORS.red : COLORS.gray} />
           </Pressable>
         </View>
       </View>
 
-      <Text style={styles.name} numberOfLines={2}>{wine.name}</Text>
+      <Text style={[styles.name, { color: colors.black }]} numberOfLines={2}>{wine.name}</Text>
 
       <View style={styles.meta}>
-        <Text style={styles.metaText}>{flag} {wine.country}</Text>
-        {wine.appellation && <Text style={styles.metaText} numberOfLines={1}>📍 {wine.appellation}</Text>}
+        <Text style={[styles.metaText, { color: colors.gray }]}>{flag} {tc(wine.country)}</Text>
+        {wine.appellation && <Text style={[styles.metaText, { color: colors.gray }]} numberOfLines={1}>📍 {wine.appellation}</Text>}
       </View>
 
       {wine.grapes && wine.grapes.length > 0 && (
-        <Text style={styles.grapes} numberOfLines={1}>🍇 {wine.grapes.join(', ')}</Text>
+        <Text style={[styles.grapes, { color: colors.gray }]} numberOfLines={1}>🍇 {wine.grapes.join(', ')}</Text>
       )}
 
       {userNote?.rating && userNote.rating > 0 && (
@@ -162,22 +164,18 @@ export default function WineCard({ wine, compact }: Props) {
 
       <View style={styles.footer}>
         <View style={styles.priceRow}>
-          <Text style={styles.price}>{wine.price?.toFixed(2)}$</Text>
+          <Text style={[styles.price, { color: colors.burgundy }]}>{wine.price?.toFixed(2)}$</Text>
           {wine.onSale && wine.originalPrice && (
             <Text style={styles.originalPrice}>{wine.originalPrice.toFixed(2)}$</Text>
           )}
         </View>
-        {wine.dealScore >= 80 && (
-          <View style={[styles.dealBadge, { backgroundColor: wine.dealScore >= 95 ? COLORS.gold : wine.dealScore >= 88 ? COLORS.green : COLORS.burgundy + '18' }]}>
-            <Text style={[styles.dealText, { color: wine.dealScore >= 88 ? COLORS.white : COLORS.burgundy }]}>
-              {wine.dealScore >= 95 ? '🏆 TROUVAILLE!' : wine.dealScore >= 88 ? '🔥 Aubaine' : '👍 Bon rapport Q/P'}
-            </Text>
-          </View>
-        )}
+        <DealBadge dealScore={wine.dealScore} />
       </View>
     </Pressable>
   );
 }
+
+export default React.memo(WineCard);
 
 const styles = StyleSheet.create({
   card: {
@@ -266,15 +264,6 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     textDecorationLine: 'line-through',
   },
-  dealBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.sm,
-  },
-  dealText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
   userRatingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -344,5 +333,30 @@ const styles = StyleSheet.create({
   compactStars: {
     flexDirection: 'row',
     gap: 1,
+  },
+  expertBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: COLORS.gold,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  expertBadgeText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  expertBadgeCompact: {
+    backgroundColor: COLORS.gold,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: RADIUS.sm,
+  },
+  expertBadgeCompactText: {
+    color: COLORS.white,
+    fontSize: 9,
+    fontWeight: '800',
   },
 });

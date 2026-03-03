@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Wine } from '@/types/wine';
+import { useAuth, registerMergeCallback } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
+import { debouncedSync, pushFavorites, deleteFavoriteCloud, clearFavoritesCloud, mergeFavorites } from '@/services/sync';
 
 const STORAGE_KEY = '@saq_fute_favorites';
 
@@ -22,7 +25,8 @@ type FavAction =
   | { type: 'LOAD'; favorites: FavWine[] }
   | { type: 'ADD'; wine: FavWine }
   | { type: 'REMOVE'; id: string }
-  | { type: 'CLEAR' };
+  | { type: 'CLEAR' }
+  | { type: 'MERGE'; favorites: FavWine[] };
 
 function reducer(state: FavState, action: FavAction): FavState {
   switch (action.type) {
@@ -35,6 +39,8 @@ function reducer(state: FavState, action: FavAction): FavState {
       return { ...state, favorites: state.favorites.filter((w) => w.id !== action.id) };
     case 'CLEAR':
       return { ...state, favorites: [] };
+    case 'MERGE':
+      return { ...state, favorites: action.favorites };
     default:
       return state;
   }
@@ -42,6 +48,7 @@ function reducer(state: FavState, action: FavAction): FavState {
 
 interface FavContextValue {
   favorites: FavWine[];
+  loaded: boolean;
   addFavorite: (wine: Wine) => void;
   removeFavorite: (id: string) => void;
   isFavorite: (id: string) => boolean;
@@ -50,6 +57,7 @@ interface FavContextValue {
 
 const FavoritesContext = createContext<FavContextValue>({
   favorites: [],
+  loaded: false,
   addFavorite: () => {},
   removeFavorite: () => {},
   isFavorite: () => false,
@@ -58,6 +66,9 @@ const FavoritesContext = createContext<FavContextValue>({
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { favorites: [], loaded: false });
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const lastAction = useRef<string | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
@@ -71,6 +82,25 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state.favorites));
     }
   }, [state.favorites, state.loaded]);
+
+  // Cloud sync: push changes when authenticated
+  useEffect(() => {
+    if (state.loaded && user && lastAction.current !== 'MERGE') {
+      debouncedSync('favorites', () => pushFavorites(user.id, state.favorites), 500, () => {
+        showToast('⚠️ Sync favoris échouée');
+      });
+    }
+    lastAction.current = null;
+  }, [state.favorites, state.loaded, user, showToast]);
+
+  // Register merge callback for full sync on login
+  useEffect(() => {
+    return registerMergeCallback(async (userId) => {
+      const merged = await mergeFavorites(userId, state.favorites);
+      lastAction.current = 'MERGE';
+      dispatch({ type: 'MERGE', favorites: merged });
+    });
+  }, [state.favorites]);
 
   const addFavorite = useCallback((wine: Wine) => {
     const fav: FavWine = {
@@ -94,7 +124,8 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 
   const removeFavorite = useCallback((id: string) => {
     dispatch({ type: 'REMOVE', id });
-  }, []);
+    if (user) deleteFavoriteCloud(user.id, id).catch(() => {});
+  }, [user]);
 
   const isFavorite = useCallback(
     (id: string) => state.favorites.some((w) => w.id === id),
@@ -103,10 +134,11 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 
   const clearAll = useCallback(() => {
     dispatch({ type: 'CLEAR' });
-  }, []);
+    if (user) clearFavoritesCloud(user.id).catch(() => {});
+  }, [user]);
 
   return (
-    <FavoritesContext.Provider value={{ favorites: state.favorites, addFavorite, removeFavorite, isFavorite, clearAll }}>
+    <FavoritesContext.Provider value={{ favorites: state.favorites, loaded: state.loaded, addFavorite, removeFavorite, isFavorite, clearAll }}>
       {children}
     </FavoritesContext.Provider>
   );

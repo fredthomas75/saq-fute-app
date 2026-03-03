@@ -144,4 +144,5 @@ export interface SearchParams {
   onlyOrganic?: boolean;
   vip?: boolean;
   limit?: number;
+  offset?: number;
 }

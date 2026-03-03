@@ -27,5 +27,31 @@
       "sizes": "180x180",
       "type": "image/png"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scanner un vin",
+      "short_name": "Scanner",
+      "url": "/camera",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mes favoris",
+      "short_name": "Favoris",
+      "url": "/favorites",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ma cave",
+      "short_name": "Cave",
+      "url": "/cellar",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Accords mets-vins",
+      "short_name": "Accords",
+      "url": "/pairing",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

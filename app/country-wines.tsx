@@ -1,34 +1,22 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, FlatList, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
+import { COUNTRY_FLAGS, decodeHtmlEntities } from '@/constants/wine';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useSettings } from '@/context/SettingsContext';
 import { saqApi } from '@/services/api';
 import type { Wine } from '@/types/wine';
 import { useTranslation } from '@/i18n';
 import WineCard from '@/components/WineCard';
 import LoadingState from '@/components/LoadingState';
+import HeaderLogo from '@/components/HeaderLogo';
 import WineListSort, { sortWines, filterByType, SortKey } from '@/components/WineListSort';
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&#039;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"');
-}
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  France: '🇫🇷', Italie: '🇮🇹', Espagne: '🇪🇸', Portugal: '🇵🇹',
-  Argentine: '🇦🇷', Chili: '🇨🇱', 'États-Unis': '🇺🇸', Australie: '🇦🇺',
-  'Nouvelle-Zélande': '🇳🇿', 'Afrique du Sud': '🇿🇦', Allemagne: '🇩🇪',
-  Canada: '🇨🇦', Grèce: '🇬🇷', Hongrie: '🇭🇺', Autriche: '🇦🇹',
-  Liban: '🇱🇧', Israël: '🇮🇱', Géorgie: '🇬🇪', Uruguay: '🇺🇾',
-};
 
 export default function CountryWinesScreen() {
   const t = useTranslation();
+  const colors = useThemeColors();
+  const { vipMode } = useSettings();
   const { country, region: initialRegion } = useLocalSearchParams<{ country: string; region?: string }>();
   const [wines, setWines] = useState<Wine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,26 +26,37 @@ export default function CountryWinesScreen() {
 
   useEffect(() => {
     if (country) {
-      Promise.all([
-        saqApi.search({ country, limit: 100 }),
-        saqApi.search({ country, limit: 50, vip: true }),
-      ])
-        .then(([regular, vip]) => {
-          const seen = new Set<string>();
-          const merged: Wine[] = [];
-          // VIP wines first (they have expert scores), then regular
-          for (const w of [...vip.wines, ...regular.wines]) {
-            if (!seen.has(w.id)) {
-              seen.add(w.id);
-              merged.push(w);
+      if (vipMode) {
+        // VIP mode: only fetch VIP-rated wines
+        saqApi.search({ country, limit: 100, vip: true })
+          .then((res) => {
+            // If API fell back to non-VIP, show empty — no 90+ wines for this country
+            setWines(res.vipFallback ? [] : res.wines);
+          })
+          .catch(() => {})
+          .finally(() => setLoading(false));
+      } else {
+        // Normal mode: fetch all wines, merge with VIP data
+        Promise.all([
+          saqApi.search({ country, limit: 100 }),
+          saqApi.search({ country, limit: 50, vip: true }),
+        ])
+          .then(([regular, vip]) => {
+            const seen = new Set<string>();
+            const merged: Wine[] = [];
+            for (const w of [...vip.wines, ...regular.wines]) {
+              if (!seen.has(w.id)) {
+                seen.add(w.id);
+                merged.push(w);
+              }
             }
-          }
-          setWines(merged);
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false));
+            setWines(merged);
+          })
+          .catch(() => {})
+          .finally(() => setLoading(false));
+      }
     }
-  }, [country]);
+  }, [country, vipMode]);
 
   const regionGroups = useMemo(() => {
     const groups: Record<string, Wine[]> = {};
@@ -80,16 +79,25 @@ export default function CountryWinesScreen() {
   if (loading) return <LoadingState message={t.map.loading} />;
 
   const flag = COUNTRY_FLAGS[country || ''] || '🏳️';
+  const subtitle = country || t.map.wines;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.cream }]}>
+      <Stack.Screen
+        options={{
+          headerTitle: '',
+          headerLeft: () => <HeaderLogo subtitle={subtitle} />,
+        }}
+      />
+
       {/* Country header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.white }]}>
         <Text style={styles.flag}>{flag}</Text>
         <View style={styles.headerInfo}>
-          <Text style={styles.countryName}>{country}</Text>
+          <Text style={[styles.countryName, { color: colors.black }]}>{country}</Text>
           <Text style={styles.countryStats}>
             {wines.length} {t.map.wines} · {regionGroups.length} {t.map.regions}
+            {vipMode ? ' · VIP 90+' : ''}
           </Text>
         </View>
       </View>
@@ -98,9 +106,9 @@ export default function CountryWinesScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.regionScroll} contentContainerStyle={styles.regionChips}>
         <Pressable
           onPress={() => setSelectedRegion(null)}
-          style={[styles.regionChip, !selectedRegion && styles.regionChipActive]}
+          style={[styles.regionChip, { backgroundColor: colors.white, borderColor: colors.grayLight }, !selectedRegion && styles.regionChipActive]}
         >
-          <Text style={[styles.regionChipText, !selectedRegion && styles.regionChipTextActive]}>
+          <Text style={[styles.regionChipText, { color: colors.grayDark }, !selectedRegion && styles.regionChipTextActive]}>
             {t.map.allRegions} ({wines.length})
           </Text>
         </Pressable>
@@ -108,9 +116,9 @@ export default function CountryWinesScreen() {
           <Pressable
             key={region}
             onPress={() => setSelectedRegion((prev) => (prev === region ? null : region))}
-            style={[styles.regionChip, selectedRegion === region && styles.regionChipActive]}
+            style={[styles.regionChip, { backgroundColor: colors.white, borderColor: colors.grayLight }, selectedRegion === region && styles.regionChipActive]}
           >
-            <Text style={[styles.regionChipText, selectedRegion === region && styles.regionChipTextActive]}>
+            <Text style={[styles.regionChipText, { color: colors.grayDark }, selectedRegion === region && styles.regionChipTextActive]}>
               {region} ({regionWines.length})
             </Text>
           </Pressable>
@@ -139,18 +147,17 @@ export default function CountryWinesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.cream },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
     padding: SPACING.md,
-    backgroundColor: COLORS.white,
     ...SHADOWS.card,
   },
   flag: { fontSize: 40 },
   headerInfo: { flex: 1 },
-  countryName: { fontSize: 22, fontWeight: '800', color: COLORS.black },
+  countryName: { fontSize: 22, fontWeight: '800' },
   countryStats: { fontSize: 14, color: COLORS.gray, marginTop: 2 },
   regionScroll: {
     minHeight: 42,
@@ -168,9 +175,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: COLORS.grayLight,
   },
   regionChipActive: {
     backgroundColor: COLORS.burgundy,
@@ -179,7 +184,6 @@ const styles = StyleSheet.create({
   regionChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.grayDark,
   },
   regionChipTextActive: {
     color: COLORS.white,

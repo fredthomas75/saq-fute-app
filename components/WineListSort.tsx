@@ -2,6 +2,7 @@ import React from 'react';
 import { View, ScrollView, Pressable, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTranslation } from '@/i18n';
 
 export type SortKey = 'default' | 'price_asc' | 'price_desc' | 'name' | 'deal' | 'rating';
@@ -39,7 +40,6 @@ export function sortWines<T extends { price: number; name: string; dealScore?: n
       case 'rating': {
         const aScore = a.maxExpertScore || 0;
         const bScore = b.maxExpertScore || 0;
-        // Wines with actual expert scores (90+) first, then by score desc
         if (aScore >= 90 && bScore < 90) return -1;
         if (bScore >= 90 && aScore < 90) return 1;
         return bScore - aScore;
@@ -56,6 +56,7 @@ export function filterByType<T extends { type: string }>(wines: T[], type?: stri
 
 export default function WineListSort({ sortBy, onSortChange, filterType, onFilterChange, showTypeFilter = true, resultCount }: Props) {
   const t = useTranslation();
+  const colors = useThemeColors();
 
   const sortLabels: Record<SortKey, string> = {
     default: '-',
@@ -67,25 +68,28 @@ export default function WineListSort({ sortBy, onSortChange, filterType, onFilte
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.white, borderBottomColor: colors.grayLight + '40' }]}>
       <View style={styles.row}>
-        <Text style={styles.label}>{t.sort.sortBy}</Text>
+        <Text style={[styles.label, { color: colors.gray }]}>{t.sort.sortBy}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {SORT_OPTIONS.map((opt) => (
-            <Pressable
-              key={opt.key}
-              onPress={() => onSortChange(sortBy === opt.key ? 'default' : opt.key)}
-              style={[styles.chip, sortBy === opt.key && styles.chipActive]}
-            >
-              <Ionicons name={opt.icon as any} size={12} color={sortBy === opt.key ? COLORS.white : COLORS.grayDark} />
-              <Text style={[styles.chipText, sortBy === opt.key && styles.chipTextActive]}>
-                {sortLabels[opt.key]}
-              </Text>
-            </Pressable>
-          ))}
+          {SORT_OPTIONS.map((opt) => {
+            const active = sortBy === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                onPress={() => onSortChange(active ? 'default' : opt.key)}
+                style={[styles.chip, { backgroundColor: colors.cream }, active && { backgroundColor: colors.burgundy }]}
+              >
+                <Ionicons name={opt.icon as any} size={12} color={active ? COLORS.white : colors.grayDark} />
+                <Text style={[styles.chipText, { color: colors.grayDark }, active && { color: COLORS.white }]}>
+                  {sortLabels[opt.key]}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
         {resultCount !== undefined && (
-          <Text style={styles.count}>{resultCount}</Text>
+          <Text style={[styles.count, { color: colors.gray }]}>{resultCount}</Text>
         )}
       </View>
 
@@ -93,19 +97,22 @@ export default function WineListSort({ sortBy, onSortChange, filterType, onFilte
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeChips}>
           <Pressable
             onPress={() => onFilterChange(undefined)}
-            style={[styles.typeChip, !filterType && styles.typeChipActive]}
+            style={[styles.typeChip, { borderColor: colors.grayLight }, !filterType && { backgroundColor: colors.burgundy, borderColor: colors.burgundy }]}
           >
-            <Text style={[styles.typeChipText, !filterType && styles.typeChipTextActive]}>{t.sort.all}</Text>
+            <Text style={[styles.typeChipText, { color: colors.grayDark }, !filterType && { color: COLORS.white }]}>{t.sort.all}</Text>
           </Pressable>
-          {WINE_TYPES.map((type) => (
-            <Pressable
-              key={type}
-              onPress={() => onFilterChange(filterType === type ? undefined : type)}
-              style={[styles.typeChip, filterType === type && styles.typeChipActive]}
-            >
-              <Text style={[styles.typeChipText, filterType === type && styles.typeChipTextActive]}>{t.wineTypes[type] || type}</Text>
-            </Pressable>
-          ))}
+          {WINE_TYPES.map((type) => {
+            const active = filterType === type;
+            return (
+              <Pressable
+                key={type}
+                onPress={() => onFilterChange(active ? undefined : type)}
+                style={[styles.typeChip, { borderColor: colors.grayLight }, active && { backgroundColor: colors.burgundy, borderColor: colors.burgundy }]}
+              >
+                <Text style={[styles.typeChipText, { color: colors.grayDark }, active && { color: COLORS.white }]}>{t.wineTypes[type] || type}</Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       )}
     </View>
@@ -114,10 +121,8 @@ export default function WineListSort({ sortBy, onSortChange, filterType, onFilte
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
     paddingVertical: SPACING.xs,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.grayLight + '40',
   },
   row: {
     flexDirection: 'row',
@@ -127,7 +132,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.gray,
     marginRight: SPACING.sm,
   },
   chips: {
@@ -142,23 +146,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.cream,
-  },
-  chipActive: {
-    backgroundColor: COLORS.burgundy,
   },
   chipText: {
     fontSize: 11,
     fontWeight: '600',
-    color: COLORS.grayDark,
-  },
-  chipTextActive: {
-    color: COLORS.white,
   },
   count: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.gray,
     marginLeft: SPACING.sm,
   },
   typeChips: {
@@ -172,18 +167,9 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.grayLight,
-  },
-  typeChipActive: {
-    backgroundColor: COLORS.burgundy,
-    borderColor: COLORS.burgundy,
   },
   typeChipText: {
     fontSize: 11,
     fontWeight: '600',
-    color: COLORS.grayDark,
-  },
-  typeChipTextActive: {
-    color: COLORS.white,
   },
 });

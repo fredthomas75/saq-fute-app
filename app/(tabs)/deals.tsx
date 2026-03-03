@@ -3,30 +3,26 @@ import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, StyleSheet
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { saqApi } from '@/services/api';
+import { apiCache } from '@/services/apiCache';
 import type { Wine } from '@/types/wine';
 import { useTranslation } from '@/i18n';
+import { useSettings } from '@/context/SettingsContext';
+import { hapticSelection } from '@/services/haptics';
+import VipBanner from '@/components/VipBanner';
 import WineCard from '@/components/WineCard';
 import DealsSkeleton from '@/components/DealsSkeleton';
 import EmptyState from '@/components/EmptyState';
 
 const BUDGETS = [15, 20, 25, 30, 50] as const;
 const BUDGET_KEY = 'deals_budget';
-const CACHE_KEY = 'deals_cache';
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-interface CacheData {
-  coeurs: Wine[];
-  deals: Wine[];
-  sweetSpot: Wine[];
-  promos: Wine[];
-  budget: number;
-  timestamp: number;
-}
 
 export default function DealsScreen() {
   const t = useTranslation();
+  const colors = useThemeColors();
   const router = useRouter();
+  const { vipMode } = useSettings();
   const [budget, setBudget] = useState<number>(25);
   const [coeurs, setCoeurs] = useState<Wine[]>([]);
   const [deals, setDeals] = useState<Wine[]>([]);
@@ -61,22 +57,41 @@ export default function DealsScreen() {
 
   // Fetch ONLY deals for a given budget (used on budget change)
   const fetchDealsOnly = useCallback(async (b: number) => {
+    // Check cache first
+    const cached = apiCache.getDeals(b, vipMode || undefined);
+    if (cached) {
+      setDeals(cached);
+      return;
+    }
+
     setDealsLoading(true);
     try {
       const floor = getFloor(b);
       const [dealsRes, sweetRes] = await Promise.all([
-        saqApi.deals({ budget: b, limit: 10 }),
+        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined }),
         floor > 0
-          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5 })
+          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined })
           : Promise.resolve({ wines: [] as Wine[] } as any),
       ]);
-      setDeals(mergeDeals(sweetRes.wines || [], dealsRes.wines));
+      const merged = mergeDeals(sweetRes.wines || [], dealsRes.wines);
+      apiCache.setDeals(b, vipMode || undefined, merged);
+      setDeals(merged);
     } catch (err) {
-      // Keep existing deals on error, just log
       console.warn('Failed to fetch deals for budget', b, err);
     } finally {
       setDealsLoading(false);
     }
+  }, [vipMode]);
+
+  // Fetch coeurs (independent of VIP — coups de coeur don't change)
+  const coeursLoaded = useRef(false);
+  const fetchCoeurs = useCallback(async () => {
+    if (coeursLoaded.current) return;
+    try {
+      const coeurRes = await saqApi.coeur({ limit: 30 });
+      setCoeurs(shuffle(coeurRes.wines).slice(0, 10));
+      coeursLoaded.current = true;
+    } catch {}
   }, []);
 
   // Full initial load (all sections)
@@ -85,17 +100,24 @@ export default function DealsScreen() {
     setError(null);
     try {
       const floor = getFloor(b);
-      const [coeurRes, dealsRes, sweetRes, promoRes] = await Promise.all([
-        saqApi.coeur({ limit: 30 }),
-        saqApi.deals({ budget: b, limit: 10 }),
+
+      // Fetch coeurs only once (VIP-independent)
+      const coeurPromise = coeursLoaded.current
+        ? Promise.resolve()
+        : fetchCoeurs();
+
+      const [, dealsRes, sweetRes, promoRes] = await Promise.all([
+        coeurPromise,
+        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined }),
         floor > 0
-          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5 })
+          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined })
           : Promise.resolve({ wines: [] as Wine[] } as any),
-        saqApi.search({ onlySale: true, limit: 10 }),
+        saqApi.search({ onlySale: true, limit: 10, vip: vipMode || undefined }),
       ]);
 
-      setCoeurs(shuffle(coeurRes.wines).slice(0, 10));
-      setDeals(mergeDeals(sweetRes.wines || [], dealsRes.wines));
+      const merged = mergeDeals(sweetRes.wines || [], dealsRes.wines);
+      apiCache.setDeals(b, vipMode || undefined, merged);
+      setDeals(merged);
       setPromos(promoRes.wines);
       initialLoaded.current = true;
     } catch (err) {
@@ -104,10 +126,11 @@ export default function DealsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [t]);
+  }, [t, vipMode, fetchCoeurs]);
 
   // Budget change: update state + fetch only deals section
   const handleBudgetChange = useCallback((b: number) => {
+    hapticSelection();
     setBudget(b);
     AsyncStorage.setItem(BUDGET_KEY, String(b)).catch(() => {});
     fetchDealsOnly(b);
@@ -124,6 +147,13 @@ export default function DealsScreen() {
     });
   }, [doFetch]);
 
+  // Re-fetch when VIP mode changes
+  useEffect(() => {
+    if (initialLoaded.current) {
+      doFetch(budget, true);
+    }
+  }, [vipMode]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await doFetch(budget, true);
@@ -135,24 +165,31 @@ export default function DealsScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.cream }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={handleRefresh}
-          tintColor={COLORS.burgundy}
-          colors={[COLORS.burgundy]}
+          tintColor={colors.burgundy}
+          colors={[colors.burgundy]}
         />
       }
     >
+      {/* VIP banner */}
+      {vipMode && (
+        <View style={{ marginTop: SPACING.md }}>
+          <VipBanner />
+        </View>
+      )}
+
       {/* Coups de Cœur */}
       {coeurs.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t.deals.coupDeCoeur}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.black }]}>{t.deals.coupDeCoeur}</Text>
             <Pressable onPress={() => router.push('/coups-de-coeur')} hitSlop={12}>
-              <Text style={styles.seeAll}>{t.deals.seeAll} ›</Text>
+              <Text style={[styles.seeAll, { color: colors.burgundy }]}>{t.deals.seeAll} ›</Text>
             </Pressable>
           </View>
           <FlatList
@@ -168,18 +205,21 @@ export default function DealsScreen() {
 
       {/* Budget selector + Top Deals */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, styles.sectionTitleStandalone]}>{t.deals.topDeals} {budget}$</Text>
+        <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.black }]}>{t.deals.topDeals} {budget}$</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.budgetRow}>
-          {BUDGETS.map((b) => (
-            <Pressable key={b} onPress={() => handleBudgetChange(b)} style={[styles.budgetBtn, budget === b && styles.budgetBtnActive]}>
-              <Text style={[styles.budgetText, budget === b && styles.budgetTextActive]}>{b}$</Text>
-            </Pressable>
-          ))}
+          {BUDGETS.map((b) => {
+            const active = budget === b;
+            return (
+              <Pressable key={b} onPress={() => handleBudgetChange(b)} style={[styles.budgetBtn, { backgroundColor: colors.white, borderColor: colors.grayLight }, active && { backgroundColor: colors.burgundy, borderColor: colors.burgundy }]} accessibilityLabel={`Budget ${b}$`} accessibilityRole="button" accessibilityState={{ selected: active }}>
+                <Text style={[styles.budgetText, { color: colors.grayDark }, active && { color: '#FFFFFF' }]}>{b}$</Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
         {dealsLoading ? (
-          <Text style={styles.emptyText}>{t.deals.loading}</Text>
+          <Text style={[styles.emptyText, { color: colors.gray }]}>{t.deals.loading}</Text>
         ) : deals.length === 0 ? (
-          <Text style={styles.emptyText}>{t.deals.noDeal}</Text>
+          <Text style={[styles.emptyText, { color: colors.gray }]}>{t.deals.noDeal}</Text>
         ) : (
           deals.map((wine) => <WineCard key={wine.id} wine={wine} />)
         )}
@@ -189,9 +229,9 @@ export default function DealsScreen() {
       {promos.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t.deals.onSale}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.black }]}>{t.deals.onSale}</Text>
             <Pressable onPress={() => router.push('/en-promo')} hitSlop={12}>
-              <Text style={styles.seeAll}>{t.deals.seeAll} ›</Text>
+              <Text style={[styles.seeAll, { color: colors.burgundy }]}>{t.deals.seeAll} ›</Text>
             </Pressable>
           </View>
           <FlatList
@@ -211,25 +251,21 @@ export default function DealsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.cream },
+  container: { flex: 1 },
   budgetRow: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, gap: SPACING.sm },
   budgetBtn: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: COLORS.grayLight,
     marginRight: SPACING.sm,
   },
-  budgetBtnActive: { backgroundColor: COLORS.burgundy, borderColor: COLORS.burgundy },
-  budgetText: { fontSize: 16, fontWeight: '600', color: COLORS.grayDark },
-  budgetTextActive: { color: COLORS.white },
+  budgetText: { fontSize: 16, fontWeight: '600' },
   section: { marginTop: SPACING.md },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
-  sectionTitle: { fontSize: 20, fontWeight: '800', color: COLORS.black },
-  seeAll: { fontSize: 14, fontWeight: '600', color: COLORS.burgundy },
+  sectionTitle: { fontSize: 20, fontWeight: '800' },
+  seeAll: { fontSize: 14, fontWeight: '600' },
   sectionTitleStandalone: { paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
   horizontalList: { paddingHorizontal: SPACING.md },
-  emptyText: { color: COLORS.gray, paddingHorizontal: SPACING.md, fontStyle: 'italic' },
+  emptyText: { paddingHorizontal: SPACING.md, fontStyle: 'italic' },
 });

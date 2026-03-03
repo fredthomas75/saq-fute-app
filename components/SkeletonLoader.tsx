@@ -1,12 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { SPACING, RADIUS } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 interface Props {
   count?: number;
 }
 
-function SkeletonCard() {
+function SkeletonCard({ cardBg, boneBg }: { cardBg: string; boneBg: string }) {
   const opacity = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
@@ -21,34 +22,36 @@ function SkeletonCard() {
   }, [opacity]);
 
   return (
-    <Animated.View style={[styles.card, { opacity }]}>
+    <Animated.View style={[styles.card, { backgroundColor: cardBg, opacity }]}>
       {/* Type pill + badge row */}
       <View style={styles.row}>
-        <View style={styles.pill} />
-        <View style={styles.pillSmall} />
+        <View style={[styles.pill, { backgroundColor: boneBg }]} />
+        <View style={[styles.pillSmall, { backgroundColor: boneBg }]} />
       </View>
       {/* Title */}
-      <View style={styles.titleLine} />
-      <View style={styles.titleLineShort} />
+      <View style={[styles.titleLine, { backgroundColor: boneBg }]} />
+      <View style={[styles.titleLineShort, { backgroundColor: boneBg }]} />
       {/* Meta */}
       <View style={styles.row}>
-        <View style={styles.metaBlock} />
-        <View style={styles.metaBlock} />
+        <View style={[styles.metaBlock, { backgroundColor: boneBg }]} />
+        <View style={[styles.metaBlock, { backgroundColor: boneBg }]} />
       </View>
       {/* Price + deal */}
       <View style={styles.footer}>
-        <View style={styles.priceLine} />
-        <View style={styles.dealBlock} />
+        <View style={[styles.priceLine, { backgroundColor: boneBg }]} />
+        <View style={[styles.dealBlock, { backgroundColor: boneBg }]} />
       </View>
     </Animated.View>
   );
 }
 
 export default function SkeletonLoader({ count = 4 }: Props) {
+  const colors = useThemeColors();
+
   return (
     <View style={styles.container}>
       {Array.from({ length: count }).map((_, i) => (
-        <SkeletonCard key={i} />
+        <SkeletonCard key={i} cardBg={colors.white} boneBg={colors.grayLight} />
       ))}
     </View>
   );
@@ -60,7 +63,6 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.sm,
   },
   card: {
-    backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     marginHorizontal: SPACING.md,
@@ -75,33 +77,28 @@ const styles = StyleSheet.create({
     width: 60,
     height: 20,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.grayLight,
   },
   pillSmall: {
     width: 40,
     height: 20,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.grayLight,
   },
   titleLine: {
     width: '85%',
     height: 16,
     borderRadius: 4,
-    backgroundColor: COLORS.grayLight,
     marginBottom: 6,
   },
   titleLineShort: {
     width: '55%',
     height: 16,
     borderRadius: 4,
-    backgroundColor: COLORS.grayLight,
     marginBottom: SPACING.sm,
   },
   metaBlock: {
     width: 90,
     height: 14,
     borderRadius: 4,
-    backgroundColor: COLORS.grayLight,
   },
   footer: {
     flexDirection: 'row',
@@ -113,12 +110,10 @@ const styles = StyleSheet.create({
     width: 70,
     height: 22,
     borderRadius: 4,
-    backgroundColor: COLORS.grayLight,
   },
   dealBlock: {
     width: 80,
     height: 24,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.grayLight,
   },
 });

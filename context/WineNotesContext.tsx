@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth, registerMergeCallback } from '@/context/AuthContext';
+import { debouncedSync, pushWineNotes, deleteNoteCloud, clearNotesCloud, mergeWineNotes } from '@/services/sync';
 
 const STORAGE_KEY = '@saq_fute_wine_notes';
 
@@ -20,7 +22,8 @@ type Action =
   | { type: 'LOAD'; notes: WineNote[] }
   | { type: 'SET_NOTE'; note: WineNote }
   | { type: 'DELETE_NOTE'; wineId: string }
-  | { type: 'CLEAR' };
+  | { type: 'CLEAR' }
+  | { type: 'MERGE'; notes: WineNote[] };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -39,6 +42,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, notes: state.notes.filter((n) => n.wineId !== action.wineId) };
     case 'CLEAR':
       return { ...state, notes: [] };
+    case 'MERGE':
+      return { ...state, notes: action.notes };
     default:
       return state;
   }
@@ -64,6 +69,8 @@ const WineNotesContext = createContext<WineNotesContextValue>({
 
 export function WineNotesProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { notes: [], loaded: false });
+  const { user } = useAuth();
+  const lastAction = useRef<string | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
@@ -77,6 +84,23 @@ export function WineNotesProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.notes, state.loaded]);
 
+  // Cloud sync: push changes when authenticated
+  useEffect(() => {
+    if (state.loaded && user && lastAction.current !== 'MERGE') {
+      debouncedSync('wine_notes', () => pushWineNotes(user.id, state.notes));
+    }
+    lastAction.current = null;
+  }, [state.notes, state.loaded, user]);
+
+  // Register merge callback for full sync on login
+  useEffect(() => {
+    return registerMergeCallback(async (userId) => {
+      const merged = await mergeWineNotes(userId, state.notes);
+      lastAction.current = 'MERGE';
+      dispatch({ type: 'MERGE', notes: merged });
+    });
+  }, [state.notes]);
+
   const setNote = useCallback((wineId: string, wineName: string, note: string, rating?: number) => {
     dispatch({
       type: 'SET_NOTE',
@@ -86,7 +110,8 @@ export function WineNotesProvider({ children }: { children: React.ReactNode }) {
 
   const deleteNote = useCallback((wineId: string) => {
     dispatch({ type: 'DELETE_NOTE', wineId });
-  }, []);
+    if (user) deleteNoteCloud(user.id, wineId).catch(() => {});
+  }, [user]);
 
   const getNote = useCallback(
     (wineId: string) => state.notes.find((n) => n.wineId === wineId),
@@ -100,7 +125,8 @@ export function WineNotesProvider({ children }: { children: React.ReactNode }) {
 
   const clearAll = useCallback(() => {
     dispatch({ type: 'CLEAR' });
-  }, []);
+    if (user) clearNotesCloud(user.id).catch(() => {});
+  }, [user]);
 
   return (
     <WineNotesContext.Provider value={{ notes: state.notes, setNote, deleteNote, getNote, hasNote, clearAll }}>
