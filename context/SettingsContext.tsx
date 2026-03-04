@@ -4,6 +4,7 @@ import * as Localization from 'expo-localization';
 import type { Locale } from '@/i18n';
 import { supabase } from '@/services/supabase';
 import { debouncedSync, pushSettings, mergeSettings } from '@/services/sync';
+import { setApiLang } from '@/services/api';
 
 const STORAGE_KEY = '@saq_fute_settings';
 
@@ -27,8 +28,11 @@ const defaultLanguage = (): Locale => {
   return deviceLang === 'en' ? 'en' : 'fr';
 };
 
+const detectedLang = defaultLanguage();
+setApiLang(detectedLang);
+
 const defaults: Settings = {
-  language: defaultLanguage(),
+  language: detectedLang,
   theme: 'auto',
   notifications: true,
   vipMode: false,
@@ -54,6 +58,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         try {
           const saved = JSON.parse(raw) as Partial<Settings>;
           setSettings((prev) => ({ ...prev, ...saved }));
+          if (saved.language) setApiLang(saved.language);
         } catch {}
       }
       setLoaded(true);
@@ -76,6 +81,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (loaded && userId) {
       mergeSettings(userId, settings).then((merged) => {
         setSettings(merged as Settings);
+        setApiLang((merged as Settings).language);
         AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
       }).catch(() => {});
     }
@@ -92,7 +98,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [userId]);
 
   const setLanguage = useCallback(
-    (language: Locale) => persist({ ...settings, language }),
+    (language: Locale) => {
+      setApiLang(language);
+      persist({ ...settings, language });
+    },
     [settings, persist]
   );
 

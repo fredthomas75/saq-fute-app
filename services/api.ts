@@ -15,8 +15,17 @@ const MAX_RETRIES = 3;
 const RETRY_DELAYS = [500, 1500, 3000]; // ms
 const API_TIMEOUT_MS = 15000; // 15s per request
 
+let currentLang: 'fr' | 'en' = 'fr';
+
+export function setApiLang(lang: 'fr' | 'en') {
+  currentLang = lang;
+}
+
 async function apiCall<T>(params: Record<string, string | number | boolean | undefined>): Promise<T> {
   const url = new URL('/api/saq', API_BASE_URL);
+  if (currentLang !== 'fr') {
+    url.searchParams.set('lang', currentLang);
+  }
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, String(value));

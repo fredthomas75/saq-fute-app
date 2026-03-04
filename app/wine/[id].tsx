@@ -64,6 +64,10 @@ export default function WineDetailScreen() {
     if (!id) return;
     setLoading(true);
     saqApi.advice(id).then((data) => {
+      if (!data.wine) {
+        setError(data.error || 'Wine not found');
+        return;
+      }
       setWine(data.wine);
       // Conseil can be at top-level OR nested inside wine — use whichever exists
       setConseil(data.conseil || (data.wine as any).conseil || null);
