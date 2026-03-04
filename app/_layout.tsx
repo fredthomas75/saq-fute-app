@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { Platform } from 'react-native';
 import { FavoritesProvider } from '@/context/FavoritesContext';
 import { SettingsProvider } from '@/context/SettingsContext';
 import { SearchHistoryProvider } from '@/context/SearchHistoryContext';
@@ -21,6 +22,7 @@ import { useTranslation } from '@/i18n';
 import OfflineBanner from '@/components/OfflineBanner';
 import ErrorBoundaryScreen from '@/components/ErrorBoundaryScreen';
 import HeaderIcons from '@/components/HeaderIcons';
+import { Analytics } from '@vercel/analytics/react';
 import 'react-native-reanimated';
 
 export { ErrorBoundary } from 'expo-router';
@@ -94,6 +96,7 @@ export default function RootLayout() {
                     <StatusBar style="light" />
                     <OfflineBanner />
                     <StackNavigator />
+                    {Platform.OS === 'web' && <Analytics />}
                   </ErrorBoundaryScreen>
                 </WineNotesProvider>
                 </WishlistProvider>
