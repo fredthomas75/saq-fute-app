@@ -383,6 +383,7 @@ export const fr = {
     signInDescription: 'Connectez-vous pour synchroniser vos données entre appareils',
     signInWithGoogle: 'Continuer avec Google',
     signInWithApple: 'Continuer avec Apple',
+    comingSoon: 'Bientôt disponible',
     signedInAs: 'Connecté en tant que',
     signOut: 'Déconnexion',
     signOutConfirm: 'Se déconnecter ?',

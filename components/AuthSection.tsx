@@ -97,11 +97,14 @@ export default function AuthSection() {
           <Text style={[styles.googleText, { color: colors.black }]}>{t.auth.signInWithGoogle}</Text>
         </Pressable>
 
-        {/* Apple Sign In */}
-        <Pressable onPress={signInWithApple} style={styles.appleBtn}>
-          <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
-          <Text style={styles.appleText}>{t.auth.signInWithApple}</Text>
-        </Pressable>
+        {/* Apple Sign In — coming soon */}
+        <View style={styles.appleBtnDisabled}>
+          <Ionicons name="logo-apple" size={20} color="#FFFFFF" style={{ opacity: 0.5 }} />
+          <Text style={[styles.appleText, { opacity: 0.5 }]}>{t.auth.signInWithApple}</Text>
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonText}>{t.auth.comingSoon}</Text>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -171,6 +174,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     borderRadius: RADIUS.md,
     paddingVertical: 12,
+  },
+  appleBtnDisabled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: '#555',
+    borderRadius: RADIUS.md,
+    paddingVertical: 12,
+    position: 'relative' as const,
+  },
+  comingSoonBadge: {
+    position: 'absolute' as const,
+    right: 10,
+    backgroundColor: COLORS.gold,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  comingSoonText: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    color: '#1E1408',
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
   },
   appleText: {
     fontSize: 15,

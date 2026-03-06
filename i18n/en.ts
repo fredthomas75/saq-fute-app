@@ -385,6 +385,7 @@ export const en: typeof fr = {
     signInDescription: 'Sign in to sync your data across devices',
     signInWithGoogle: 'Continue with Google',
     signInWithApple: 'Continue with Apple',
+    comingSoon: 'Coming soon',
     signedInAs: 'Signed in as',
     signOut: 'Sign out',
     signOutConfirm: 'Sign out?',
