@@ -66,22 +66,22 @@ async function apiCall<T>(params: Record<string, string | number | boolean | und
 }
 
 export const saqApi = {
-  search: (params: SearchParams) =>
+  search: (params: SearchParams & { lang?: string }) =>
     apiCall<SearchResponse>({ action: 'search', ...params }),
 
-  deals: (params: { budget?: number; type?: string; limit?: number; vip?: boolean }) =>
+  deals: (params: { budget?: number; type?: string; limit?: number; vip?: boolean; lang?: string }) =>
     apiCall<DealsResponse>({ action: 'deals', ...params }),
 
-  pairing: (params: { dish: string; budget?: number; vip?: boolean }) =>
+  pairing: (params: { dish: string; budget?: number; vip?: boolean; lang?: string }) =>
     apiCall<PairingResponse>({ action: 'pairing', ...params }),
 
-  compare: (wine1: string, wine2: string) =>
-    apiCall<CompareResponse>({ action: 'compare', wine1, wine2 }),
+  compare: (wine1: string, wine2: string, lang?: string) =>
+    apiCall<CompareResponse>({ action: 'compare', wine1, wine2, lang }),
 
-  advice: (wine: string) =>
-    apiCall<AdviceResponse>({ action: 'advice', wine }),
+  advice: (wine: string, lang?: string) =>
+    apiCall<AdviceResponse>({ action: 'advice', wine, lang }),
 
-  coeur: (params?: { type?: string; budget?: number; grape?: string; country?: string; sort?: string; limit?: number }) =>
+  coeur: (params?: { type?: string; budget?: number; grape?: string; country?: string; sort?: string; limit?: number; lang?: string }) =>
     apiCall<CoeurResponse>({ action: 'coeur', ...params }),
 
   browse: (query: string) =>

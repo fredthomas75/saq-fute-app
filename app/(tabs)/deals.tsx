@@ -22,7 +22,7 @@ export default function DealsScreen() {
   const t = useTranslation();
   const colors = useThemeColors();
   const router = useRouter();
-  const { vipMode } = useSettings();
+  const { vipMode, language } = useSettings();
   const [budget, setBudget] = useState<number>(25);
   const [coeurs, setCoeurs] = useState<Wine[]>([]);
   const [deals, setDeals] = useState<Wine[]>([]);
@@ -68,9 +68,9 @@ export default function DealsScreen() {
     try {
       const floor = getFloor(b);
       const [dealsRes, sweetRes] = await Promise.all([
-        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined }),
+        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined, lang: language }),
         floor > 0
-          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined })
+          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined, lang: language })
           : Promise.resolve({ wines: [] as Wine[] } as any),
       ]);
       const merged = mergeDeals(sweetRes.wines || [], dealsRes.wines);
@@ -88,7 +88,7 @@ export default function DealsScreen() {
   const fetchCoeurs = useCallback(async () => {
     if (coeursLoaded.current) return;
     try {
-      const coeurRes = await saqApi.coeur({ limit: 30 });
+      const coeurRes = await saqApi.coeur({ limit: 30, lang: language });
       setCoeurs(shuffle(coeurRes.wines).slice(0, 10));
       coeursLoaded.current = true;
     } catch {}
@@ -108,11 +108,11 @@ export default function DealsScreen() {
 
       const [, dealsRes, sweetRes, promoRes] = await Promise.all([
         coeurPromise,
-        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined }),
+        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined, lang: language }),
         floor > 0
-          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined })
+          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined, lang: language })
           : Promise.resolve({ wines: [] as Wine[] } as any),
-        saqApi.search({ onlySale: true, limit: 10, vip: vipMode || undefined }),
+        saqApi.search({ onlySale: true, limit: 10, vip: vipMode || undefined, lang: language }),
       ]);
 
       const merged = mergeDeals(sweetRes.wines || [], dealsRes.wines);

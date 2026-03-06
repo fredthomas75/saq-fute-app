@@ -48,7 +48,7 @@ const DISH_EMOJIS: Record<string, string> = {
 export default function PairingScreen() {
   const t = useTranslation();
   const router = useRouter();
-  const { vipMode } = useSettings();
+  const { vipMode, language } = useSettings();
   const colors = useThemeColors();
   const [dish, setDish] = useState('');
   const [results, setResults] = useState<Wine[]>([]);
@@ -76,7 +76,7 @@ export default function PairingScreen() {
     setLoading(true);
     setError(false);
     try {
-      const data = await saqApi.pairing({ dish: d, vip: vipMode || undefined });
+      const data = await saqApi.pairing({ dish: d, vip: vipMode || undefined, lang: language });
       apiCache.setPairing(d, vipMode || undefined, data);
       setResults(data.wines);
     } catch {

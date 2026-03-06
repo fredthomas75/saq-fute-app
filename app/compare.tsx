@@ -4,12 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTranslation, useTranslateCountry } from '@/i18n';
+import { useSettings } from '@/context/SettingsContext';
 import { saqApi } from '@/services/api';
 import type { Wine, CompareResponse } from '@/types/wine';
 
 export default function CompareScreen() {
   const t = useTranslation();
   const tc = useTranslateCountry();
+  const { language } = useSettings();
   const colors = useThemeColors();
 
   const [wine1, setWine1] = useState('');
@@ -24,7 +26,7 @@ export default function CompareScreen() {
     setError('');
     setResult(null);
     try {
-      const data = await saqApi.compare(wine1.trim(), wine2.trim());
+      const data = await saqApi.compare(wine1.trim(), wine2.trim(), language);
       if (data.error) {
         setError(data.error);
       } else {

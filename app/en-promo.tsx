@@ -4,6 +4,7 @@ import { COLORS, SPACING } from '@/constants/theme';
 import { saqApi } from '@/services/api';
 import type { Wine } from '@/types/wine';
 import { useTranslation } from '@/i18n';
+import { useSettings } from '@/context/SettingsContext';
 import WineCard from '@/components/WineCard';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
@@ -11,6 +12,7 @@ import WineListSort, { sortWines, filterByType, SortKey } from '@/components/Win
 
 export default function EnPromoScreen() {
   const t = useTranslation();
+  const { language } = useSettings();
   const [wines, setWines] = useState<Wine[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -21,7 +23,7 @@ export default function EnPromoScreen() {
   const fetchPromos = useCallback(async () => {
     setError(null);
     try {
-      const res = await saqApi.search({ onlySale: true, limit: 100 });
+      const res = await saqApi.search({ onlySale: true, limit: 100, lang: language });
       setWines(res.wines);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.error);

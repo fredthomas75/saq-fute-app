@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SAQ Futé",
+    "name": "saq-fute-app",
     "slug": "saq-fute-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,60 +11,30 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFF8F0"
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fredthomas.saqfute",
-      "buildNumber": "1",
+      "bundleIdentifier": "com.fredthomas75.saqfuteapp",
       "infoPlist": {
-        "NSCameraUsageDescription": "SAQ Futé utilise la caméra pour scanner les codes-barres et étiquettes de vin.",
-        "NSPhotoLibraryUsageDescription": "SAQ Futé accède à vos photos pour scanner les menus de restaurant.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.fredthomas.saqfute",
-      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#722F37"
+        "backgroundColor": "#ffffff"
       },
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
-      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
-      "name": "SAQ Futé",
-      "shortName": "SAQ Futé",
-      "description": "Trouvez les meilleurs vins au meilleur prix à la SAQ.",
-      "lang": "fr",
-      "themeColor": "#722F37",
-      "backgroundColor": "#FFF8F0"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      "expo-localization",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Permettre à SAQ Futé d'accéder à la caméra pour scanner les codes-barres et étiquettes de vin."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Permettre à SAQ Futé d'accéder à vos photos pour scanner les menus de restaurant."
-        }
-      ]
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
@@ -75,7 +45,6 @@
         "projectId": "f5bd587f-6a1a-49f1-8db2-98419fd8ec6e"
       }
     },
-    "owner": "fredthomas75",
     "runtimeVersion": {
       "policy": "appVersion"
     },

@@ -20,7 +20,7 @@ export default function MapScreen() {
   const t = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const { vipMode } = useSettings();
+  const { vipMode, language } = useSettings();
   const [countries, setCountries] = useState<CountryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalWines, setTotalWines] = useState(0);
@@ -46,7 +46,7 @@ export default function MapScreen() {
             const batchResults = await Promise.all(
               batch.map(async (c) => {
                 try {
-                  const res = await saqApi.search({ country: c.country, vip: true, limit: 1 });
+                  const res = await saqApi.search({ country: c.country, vip: true, limit: 1, lang: language });
                   if (res.vipFallback) return { country: c.country, count: 0 };
                   return { country: c.country, count: res.count || 0 };
                 } catch {
@@ -84,14 +84,14 @@ export default function MapScreen() {
       let totalCount = 0;
 
       if (vipMode) {
-        const res = await saqApi.search({ country, limit: 100, vip: true });
+        const res = await saqApi.search({ country, limit: 100, vip: true, lang: language });
         // If API fell back to non-VIP, no 90+ wines for this country
         allWines = res.vipFallback ? [] : res.wines;
         totalCount = res.vipFallback ? 0 : (res.count || res.wines.length);
       } else {
         const [regular, vip] = await Promise.all([
-          saqApi.search({ country, limit: 100 }),
-          saqApi.search({ country, limit: 50, vip: true }),
+          saqApi.search({ country, limit: 100, lang: language }),
+          saqApi.search({ country, limit: 50, vip: true, lang: language }),
         ]);
         // Use the regular search count as the true total for this country
         totalCount = regular.count || regular.wines.length;

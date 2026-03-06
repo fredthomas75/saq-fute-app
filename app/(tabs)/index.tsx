@@ -28,7 +28,7 @@ export default function SearchScreen() {
   const tc = useTranslateCountry();
   const colors = useThemeColors();
   const router = useRouter();
-  const { vipMode } = useSettings();
+  const { vipMode, language } = useSettings();
   const { history, addEntry, removeEntry, clearHistory } = useSearchHistory();
   const params = useLocalSearchParams<{ query?: string }>();
   const [query, setQuery] = useState('');
@@ -82,6 +82,7 @@ export default function SearchScreen() {
       minPrice: filters.priceMin || undefined,
       maxPrice: filters.priceMax || undefined,
       limit: PAGE_SIZE,
+      lang: language,
     };
 
     // Check cache first (unless forced refresh)
@@ -143,6 +144,7 @@ export default function SearchScreen() {
         maxPrice: filters.priceMax || undefined,
         limit: PAGE_SIZE,
         offset,
+        lang: language,
       };
       const data = await saqApi.search(searchParams);
       if (data.wines.length > 0) {

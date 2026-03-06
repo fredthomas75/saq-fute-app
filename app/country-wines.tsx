@@ -16,7 +16,7 @@ import WineListSort, { sortWines, filterByType, SortKey } from '@/components/Win
 export default function CountryWinesScreen() {
   const t = useTranslation();
   const colors = useThemeColors();
-  const { vipMode } = useSettings();
+  const { vipMode, language } = useSettings();
   const { country, region: initialRegion } = useLocalSearchParams<{ country: string; region?: string }>();
   const [wines, setWines] = useState<Wine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +28,7 @@ export default function CountryWinesScreen() {
     if (country) {
       if (vipMode) {
         // VIP mode: only fetch VIP-rated wines
-        saqApi.search({ country, limit: 100, vip: true })
+        saqApi.search({ country, limit: 100, vip: true, lang: language })
           .then((res) => {
             // If API fell back to non-VIP, show empty — no 90+ wines for this country
             setWines(res.vipFallback ? [] : res.wines);
@@ -38,8 +38,8 @@ export default function CountryWinesScreen() {
       } else {
         // Normal mode: fetch all wines, merge with VIP data
         Promise.all([
-          saqApi.search({ country, limit: 100 }),
-          saqApi.search({ country, limit: 50, vip: true }),
+          saqApi.search({ country, limit: 100, lang: language }),
+          saqApi.search({ country, limit: 50, vip: true, lang: language }),
         ])
           .then(([regular, vip]) => {
             const seen = new Set<string>();
