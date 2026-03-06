@@ -99,6 +99,10 @@ export const fr = {
     thinking: '⏳ Réflexion...',
     error: '❌ Erreur de connexion. Le chat IA sera disponible prochainement.',
     viewOnSAQ: 'Voir sur SAQ.com',
+    addImage: 'Ajouter une image',
+    takePhoto: 'Prendre une photo',
+    imageAttached: 'Image jointe',
+    imagePromptPlaceholder: 'Ajoute un message (optionnel)...',
     suggestions: [
       'Bon vin rouge sous 20$ ?',
       'Vin pour accompagner un sushi ?',

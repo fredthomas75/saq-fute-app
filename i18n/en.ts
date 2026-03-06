@@ -101,6 +101,10 @@ export const en: typeof fr = {
     thinking: '⏳ Thinking...',
     error: '❌ Connection error. AI chat will be available soon.',
     viewOnSAQ: 'View on SAQ.com',
+    addImage: 'Add an image',
+    takePhoto: 'Take a photo',
+    imageAttached: 'Image attached',
+    imagePromptPlaceholder: 'Add a message (optional)...',
     suggestions: [
       'Good red wine under $20?',
       'Wine to pair with sushi?',

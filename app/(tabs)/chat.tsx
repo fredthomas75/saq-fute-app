@@ -1,11 +1,50 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform, Linking, Animated, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform, Linking, Animated, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { sendChatMessage, type ChatMessage } from '@/services/chat';
 import { useTranslation } from '@/i18n';
 import { useSettings } from '@/context/SettingsContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
+
+// Web: use native HTML file input for reliable camera/gallery on mobile browsers
+// Native: use expo-image-picker
+let ImagePicker: typeof import('expo-image-picker') | null = null;
+if (Platform.OS !== 'web') {
+  try { ImagePicker = require('expo-image-picker'); } catch {}
+}
+
+/** Read a File as base64 data URL and extract the raw base64 string */
+function readFileAsBase64(file: File): Promise<{ uri: string; base64: string } | null> {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      const b64 = dataUrl?.split(',')[1] || '';
+      resolve(b64 ? { uri: dataUrl, base64: b64 } : null);
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+function openWebFilePicker(capture?: boolean): Promise<{ uri: string; base64: string } | null> {
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    if (capture) input.setAttribute('capture', 'environment');
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) { resolve(null); return; }
+      resolve(await readFileAsBase64(file));
+    };
+    // User cancelled
+    const onFocus = () => { setTimeout(() => { if (!input.files?.length) resolve(null); }, 500); };
+    window.addEventListener('focus', onFocus, { once: true });
+    input.click();
+  });
+}
 
 const URL_SPLIT = /(https?:\/\/[^\s)\]>,]+)/g;
 const IS_URL = /^https?:\/\//;
@@ -128,6 +167,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pendingImage, setPendingImage] = useState<{ uri: string; base64: string } | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -144,12 +184,63 @@ export default function ChatScreen() {
     return () => { if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current); };
   }, []);
 
+  const pickImage = async () => {
+    if (loading) return;
+    if (Platform.OS === 'web') {
+      const result = await openWebFilePicker(false);
+      if (result) setPendingImage(result);
+      return;
+    }
+    if (!ImagePicker) return;
+    const res = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.7 as number });
+    if (!res.canceled && res.assets[0]) {
+      setPendingImage({ uri: res.assets[0].uri, base64: res.assets[0].base64 || '' });
+    }
+  };
+
+  const takePhoto = async () => {
+    if (loading) return;
+    if (Platform.OS === 'web') {
+      // On mobile web, capture="environment" opens the back camera directly
+      const result = await openWebFilePicker(true);
+      if (result) setPendingImage(result);
+      return;
+    }
+    if (!ImagePicker) return;
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) return;
+    const res = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.7 as number });
+    if (!res.canceled && res.assets[0]) {
+      let b64 = res.assets[0].base64 || '';
+      if (b64.startsWith('data:')) b64 = b64.split(',')[1] || '';
+      if (!b64 && res.assets[0].uri?.startsWith('data:')) b64 = res.assets[0].uri.split(',')[1] || '';
+      if (b64) setPendingImage({ uri: res.assets[0].uri, base64: b64 });
+    }
+  };
+
   const send = async (text?: string) => {
     const msg = text || input.trim();
-    if (!msg || loading) return;
+    if ((!msg && !pendingImage) || loading) return;
     setInput('');
 
-    const userMsg: ChatMessage = { role: 'user', content: msg };
+    let userMsg: ChatMessage;
+    let displayUri: string | undefined;
+
+    if (pendingImage) {
+      const contentBlocks: any[] = [];
+      if (msg) contentBlocks.push({ type: 'text', text: msg });
+      else contentBlocks.push({ type: 'text', text: language === 'en' ? 'What can you tell me about this wine?' : 'Que peux-tu me dire sur ce vin ?' });
+      contentBlocks.push({
+        type: 'image_url',
+        image_url: { url: `data:image/jpeg;base64,${pendingImage.base64}` },
+      });
+      userMsg = { role: 'user', content: contentBlocks };
+      displayUri = pendingImage.uri;
+      setPendingImage(null);
+    } else {
+      userMsg = { role: 'user', content: msg };
+    }
+
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setLoading(true);
@@ -164,16 +255,39 @@ export default function ChatScreen() {
     }
   };
 
-  const renderMessage = useCallback(({ item }: { item: ChatMessage }) => (
-    <View style={[
-      styles.bubble,
-      item.role === 'user'
-        ? styles.userBubble
-        : [styles.assistantBubble, { backgroundColor: colors.white }],
-    ]}>
-      <MessageContent text={item.content as string} isUser={item.role === 'user'} textColor={item.role === 'user' ? undefined : colors.black} />
-    </View>
-  ), [colors.white, colors.black]);
+  const renderMessage = useCallback(({ item }: { item: ChatMessage }) => {
+    const isUser = item.role === 'user';
+    const hasImage = Array.isArray(item.content);
+
+    // Extract text and image from content
+    let textContent = '';
+    let imageUri: string | undefined;
+
+    if (hasImage) {
+      for (const block of item.content as any[]) {
+        if (block.type === 'text') textContent = block.text || '';
+        if (block.type === 'image_url') imageUri = block.image_url?.url;
+      }
+    } else {
+      textContent = item.content as string;
+    }
+
+    return (
+      <View style={[
+        styles.bubble,
+        isUser
+          ? styles.userBubble
+          : [styles.assistantBubble, { backgroundColor: colors.white }],
+      ]}>
+        {imageUri && (
+          <Image source={{ uri: imageUri }} style={styles.chatImage} resizeMode="cover" />
+        )}
+        {textContent ? (
+          <MessageContent text={textContent} isUser={isUser} textColor={isUser ? undefined : colors.black} />
+        ) : null}
+      </View>
+    );
+  }, [colors.white, colors.black]);
 
   return (
     <KeyboardAvoidingView
@@ -212,19 +326,35 @@ export default function ChatScreen() {
         />
       )}
 
-      <View style={[styles.inputRow, { backgroundColor: colors.white, borderTopColor: colors.grayLight }]}>
+      {pendingImage && (
+        <View style={[styles.previewRow, { backgroundColor: colors.white, borderTopColor: colors.grayLight }]}>
+          <Image source={{ uri: pendingImage.uri }} style={styles.previewThumb} resizeMode="cover" />
+          <Text style={[styles.previewText, { color: colors.black }]} numberOfLines={1}>{t.chat.imageAttached}</Text>
+          <Pressable onPress={() => setPendingImage(null)} hitSlop={8}>
+            <Ionicons name="close-circle" size={22} color={COLORS.gray} />
+          </Pressable>
+        </View>
+      )}
+
+      <View style={[styles.inputRow, { backgroundColor: colors.white, borderTopColor: pendingImage ? 'transparent' : colors.grayLight }]}>
+        <Pressable onPress={takePhoto} style={styles.attachBtn} disabled={loading} accessibilityLabel={t.chat.takePhoto}>
+          <Ionicons name="camera-outline" size={24} color={loading ? COLORS.gray : COLORS.burgundy} />
+        </Pressable>
+        <Pressable onPress={pickImage} style={styles.attachBtn} disabled={loading} accessibilityLabel={t.chat.addImage}>
+          <Ionicons name="image-outline" size={22} color={loading ? COLORS.gray : COLORS.burgundy} />
+        </Pressable>
         <TextInput
           style={[styles.input, { color: colors.black, backgroundColor: colors.cream }]}
           value={input}
           onChangeText={setInput}
-          placeholder={t.chat.placeholder}
+          placeholder={pendingImage ? (t.chat.imagePromptPlaceholder) : t.chat.placeholder}
           placeholderTextColor={COLORS.gray}
           onSubmitEditing={() => send()}
           returnKeyType="send"
           editable={!loading}
           accessibilityLabel={t.chat.placeholder}
         />
-        <Pressable onPress={() => send()} style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]} accessibilityLabel="Send" accessibilityRole="button">
+        <Pressable onPress={() => send()} style={[styles.sendBtn, (!input.trim() && !pendingImage || loading) && styles.sendBtnDisabled]} accessibilityLabel="Send" accessibilityRole="button">
           <Ionicons name="send" size={20} color={COLORS.white} />
         </Pressable>
       </View>
@@ -312,6 +442,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendBtnDisabled: { opacity: 0.4 },
+  attachBtn: {
+    padding: 6,
+    marginRight: 4,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+    borderTopWidth: 1,
+  },
+  previewThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.sm,
+  },
+  previewText: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.gray,
+  },
+  chatImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
   thinkingRow: {
     flexDirection: 'row',
     alignItems: 'center',

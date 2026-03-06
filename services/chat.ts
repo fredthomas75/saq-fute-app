@@ -54,7 +54,7 @@ export async function sendChatMessage(messages: ChatMessage[], language: string 
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages: [systemPrompt, ...messages] }),
+    body: JSON.stringify({ messages: [systemPrompt, ...messages], lang: language }),
   }, 30000);
 
   if (!response.ok) {
@@ -86,7 +86,7 @@ export async function analyzeWineLabel(imageBase64: string): Promise<string> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages }),
-  }, 20000);
+  }, 45000);
 
   if (!response.ok) throw new Error('Erreur analyse étiquette');
   const data = await response.json();
@@ -118,7 +118,7 @@ Sois concis et pratique. Si le menu n'est pas lisible, dis-le.`,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages }),
-  }, 20000);
+  }, 45000);
 
   if (!response.ok) throw new Error('Erreur analyse menu');
   const data = await response.json();
