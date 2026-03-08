@@ -63,6 +63,8 @@ export default function SearchScreen() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [vipFallback, setVipFallback] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>('default');
+  const [allResults, setAllResults] = useState<Wine[] | null>(null); // full result set for sorting
+  const [loadingAll, setLoadingAll] = useState(false);
 
   // Cleanup search timer on unmount
   useEffect(() => {
@@ -119,6 +121,7 @@ export default function SearchScreen() {
 
     setLoading(true);
     setError(null);
+    setAllResults(null); // clear full cache on new search
     pageRef.current = 0;
     try {
       const data = await saqApi.search(searchParams);
@@ -170,6 +173,41 @@ export default function SearchScreen() {
       setLoadingMore(false);
     }
   }, [buildSearchParams]);
+
+  // Fetch ALL results when sort is active (API max 200 per batch)
+  const FETCH_ALL_BATCH = 200;
+  const fetchAllResults = useCallback(async () => {
+    if (loadingAll) return;
+    setLoadingAll(true);
+    try {
+      const baseParams = buildSearchParams();
+      let all: Wine[] = [];
+      let offset = 0;
+      let total = Infinity;
+      while (all.length < total) {
+        const data = await saqApi.search({ ...baseParams, limit: FETCH_ALL_BATCH, offset } as any);
+        total = data.count || data.wines.length;
+        all = [...all, ...data.wines];
+        if (data.wines.length < FETCH_ALL_BATCH) break;
+        offset += FETCH_ALL_BATCH;
+      }
+      // Deduplicate
+      const seen = new Set<string>();
+      const unique = all.filter((w) => { if (seen.has(w.id)) return false; seen.add(w.id); return true; });
+      setAllResults(unique);
+    } catch {
+      // Keep existing partial results
+    } finally {
+      setLoadingAll(false);
+    }
+  }, [buildSearchParams, loadingAll]);
+
+  // Trigger fetchAll when sort is activated and we don't have all results yet
+  useEffect(() => {
+    if (sortBy !== 'default' && !allResults && hasSearched && totalCount > results.length && !loadingAll) {
+      fetchAllResults();
+    }
+  }, [sortBy, allResults, hasSearched, totalCount, results.length, loadingAll, fetchAllResults]);
 
   // Fetch stats for trending section (cached 30 min)
   useEffect(() => {
@@ -254,17 +292,22 @@ export default function SearchScreen() {
   }, [results.length, totalCount]);
 
   // Memoized scroll handler — avoids re-creating on every render
+  // Skip infinite scroll when sort is active (all results already loaded)
   const handleScroll = useCallback((e: any) => {
     const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
     setShowScrollTop(contentOffset.y > 600);
+    if (sortBy !== 'default') return; // all results loaded via fetchAll
     const distFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
     if (distFromBottom < layoutMeasurement.height * 1.5) {
       loadMore();
     }
-  }, [loadMore]);
+  }, [loadMore, sortBy]);
 
-  // Client-side sort on loaded results
-  const sortedResults = useMemo(() => sortWines(results, sortBy), [results, sortBy]);
+  // Client-side sort — use allResults when fully loaded, else use partial results
+  const sortedResults = useMemo(() => {
+    const source = (sortBy !== 'default' && allResults) ? allResults : results;
+    return sortWines(source, sortBy);
+  }, [results, allResults, sortBy]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.cream }]}>
@@ -455,8 +498,14 @@ export default function SearchScreen() {
               </AnimatedListItem>
             ))}
 
-            {/* Footer: loading spinner or count */}
-            {results.length < totalCount && (
+            {/* Footer: loading all for sort, loading more, or count */}
+            {loadingAll && (
+              <View style={styles.loadingMore}>
+                <ActivityIndicator size="small" color={colors.burgundy} />
+                <Text style={[styles.loadingMoreText, { color: colors.gray }]}>{t.common.loading}</Text>
+              </View>
+            )}
+            {!loadingAll && sortBy === 'default' && results.length < totalCount && (
               loadingMore ? (
                 <View style={styles.loadingMore}>
                   <ActivityIndicator size="small" color={colors.burgundy} />
