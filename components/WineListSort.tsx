@@ -5,7 +5,7 @@ import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTranslation } from '@/i18n';
 
-export type SortKey = 'default' | 'price_asc' | 'price_desc' | 'name' | 'deal' | 'rating';
+export type SortKey = 'default' | 'price_asc' | 'price_desc' | 'name' | 'rating';
 
 interface Props {
   sortBy: SortKey;
@@ -20,13 +20,12 @@ const SORT_OPTIONS: { key: SortKey; icon: string }[] = [
   { key: 'price_asc', icon: 'arrow-up' },
   { key: 'price_desc', icon: 'arrow-down' },
   { key: 'name', icon: 'text' },
-  { key: 'deal', icon: 'flame' },
   { key: 'rating', icon: 'star' },
 ];
 
 const WINE_TYPES = ['Rouge', 'Blanc', 'Rosé', 'Mousseux'];
 
-export function sortWines<T extends { price: number; name: string; dealScore?: number; maxExpertScore?: number }>(
+export function sortWines<T extends { price: number; name: string; maxExpertScore?: number }>(
   wines: T[],
   sortBy: SortKey,
 ): T[] {
@@ -36,7 +35,6 @@ export function sortWines<T extends { price: number; name: string; dealScore?: n
       case 'price_asc': return a.price - b.price;
       case 'price_desc': return b.price - a.price;
       case 'name': return a.name.localeCompare(b.name);
-      case 'deal': return (b.dealScore || 0) - (a.dealScore || 0);
       case 'rating': {
         const aScore = a.maxExpertScore || 0;
         const bScore = b.maxExpertScore || 0;
@@ -63,7 +61,6 @@ export default function WineListSort({ sortBy, onSortChange, filterType, onFilte
     price_asc: t.sort.priceAsc,
     price_desc: t.sort.priceDesc,
     name: t.sort.name,
-    deal: t.sort.bestDeal,
     rating: t.sort.rating,
   };
 

@@ -21,7 +21,7 @@ import SkeletonLoader from '@/components/SkeletonLoader';
 import FilterBottomSheet, { FilterState } from '@/components/FilterBottomSheet';
 import WineListSort, { sortWines, type SortKey } from '@/components/WineListSort';
 
-const CARD_HEIGHT = 170;
+const CARD_HEIGHT = 180;
 const PAGE_SIZE = 20;
 
 export default function SearchScreen() {
@@ -223,7 +223,7 @@ export default function SearchScreen() {
   // Client-side sort on loaded results
   const sortedResults = useMemo(() => sortWines(results, sortBy), [results, sortBy]);
 
-  // FlatList optimization: fixed item height
+  // FlatList layout hint for virtualization (enables proper scroll sizing on web)
   const getItemLayout = useCallback((_: any, index: number) => ({
     length: CARD_HEIGHT,
     offset: CARD_HEIGHT * index,
@@ -395,12 +395,12 @@ export default function SearchScreen() {
       )}
 
       {!loading && results.length > 0 && (
-        <>
+        <View style={{ flex: 1 }}>
           <WineListSort
             sortBy={sortBy}
             onSortChange={setSortBy}
             showTypeFilter={false}
-            resultCount={results.length}
+            resultCount={totalCount}
           />
           <FlatList
             ref={flatListRef}
@@ -416,9 +416,15 @@ export default function SearchScreen() {
             getItemLayout={getItemLayout}
             maxToRenderPerBatch={8}
             windowSize={5}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.4}
-            onScroll={(e) => setShowScrollTop(e.nativeEvent.contentOffset.y > 600)}
+            onEndReachedThreshold={0.5}
+            onScroll={(e) => {
+              const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+              setShowScrollTop(contentOffset.y > 600);
+              // Reliable infinite scroll for web: trigger loadMore when near bottom
+              if (contentSize.height - contentOffset.y - layoutMeasurement.height < layoutMeasurement.height * 0.5) {
+                loadMore();
+              }
+            }}
             scrollEventThrottle={200}
             ListFooterComponent={
               loadingMore ? (
@@ -448,7 +454,7 @@ export default function SearchScreen() {
               <Ionicons name="chevron-up" size={22} color={COLORS.white} />
             </Pressable>
           )}
-        </>
+        </View>
       )}
 
       {/* Bottom sheet filters */}
