@@ -31,11 +31,13 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
   const colors = useThemeColors();
   const { height: screenHeight } = useWindowDimensions();
   const [filters, setFilters] = useState<FilterState>(initialFilters);
+  const [countryOpen, setCountryOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(screenHeight)).current;
 
   useEffect(() => {
     if (visible) {
       setFilters(initialFilters);
+      setCountryOpen(false);
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -118,31 +120,42 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
           })}
         </View>
 
-        {/* Country */}
+        {/* Country dropdown */}
         {countries && countries.length > 0 && (
           <>
             <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.country}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.countryRow}>
-              <Pressable
-                onPress={() => setFilters((f) => ({ ...f, country: undefined }))}
-                style={[styles.countryChip, { backgroundColor: colors.cream, borderColor: colors.grayLight }, !filters.country && { backgroundColor: colors.burgundy, borderColor: colors.burgundy }]}
-              >
-                <Text style={[styles.countryChipText, { color: colors.grayDark }, !filters.country && { color: '#FFFFFF' }]}>{t.filters.allCountries}</Text>
-              </Pressable>
-              {countries.map((c) => {
-                const isActive = filters.country === c.country;
-                return (
-                  <Pressable
-                    key={c.country}
-                    onPress={() => setFilters((f) => ({ ...f, country: f.country === c.country ? undefined : c.country }))}
-                    style={[styles.countryChip, { backgroundColor: colors.cream, borderColor: colors.grayLight }, isActive && { backgroundColor: colors.burgundy, borderColor: colors.burgundy }]}
-                  >
-                    <Text style={[styles.countryChipText, { color: colors.grayDark }, isActive && { color: '#FFFFFF' }]}>{c.country}</Text>
-                    <Text style={[styles.countryCount, { color: colors.gray }, isActive && { color: '#FFFFFF80' }]}>{c.count}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            <Pressable
+              onPress={() => setCountryOpen((o) => !o)}
+              style={[styles.dropdown, { borderColor: colors.grayLight, backgroundColor: colors.cream }]}
+            >
+              <Text style={[styles.dropdownText, { color: filters.country ? colors.black : colors.gray }]}>
+                {filters.country || t.filters.allCountries}
+              </Text>
+              <Ionicons name={countryOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.gray} />
+            </Pressable>
+            {countryOpen && (
+              <ScrollView style={[styles.dropdownList, { borderColor: colors.grayLight, backgroundColor: colors.cream }]} nestedScrollEnabled>
+                <Pressable
+                  onPress={() => { setFilters((f) => ({ ...f, country: undefined })); setCountryOpen(false); }}
+                  style={[styles.dropdownItem, !filters.country && { backgroundColor: colors.burgundy + '15' }]}
+                >
+                  <Text style={[styles.dropdownItemText, { color: colors.black }, !filters.country && { color: colors.burgundy, fontWeight: '700' }]}>{t.filters.allCountries}</Text>
+                </Pressable>
+                {countries.map((c) => {
+                  const isActive = filters.country === c.country;
+                  return (
+                    <Pressable
+                      key={c.country}
+                      onPress={() => { setFilters((f) => ({ ...f, country: c.country })); setCountryOpen(false); }}
+                      style={[styles.dropdownItem, isActive && { backgroundColor: colors.burgundy + '15' }]}
+                    >
+                      <Text style={[styles.dropdownItemText, { color: colors.black }, isActive && { color: colors.burgundy, fontWeight: '700' }]}>{c.country}</Text>
+                      <Text style={[styles.dropdownItemCount, { color: colors.gray }]}>{c.count}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
           </>
         )}
 
@@ -289,26 +302,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  countryRow: {
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    paddingBottom: 2,
-  },
-  countryChip: {
+  dropdown: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: RADIUS.full,
+    justifyContent: 'space-between',
     borderWidth: 1,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
   },
-  countryChipText: {
-    fontSize: 12,
+  dropdownText: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  countryCount: {
-    fontSize: 10,
+  dropdownList: {
+    maxHeight: 160,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: RADIUS.sm,
+    borderBottomRightRadius: RADIUS.sm,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm - 2,
+  },
+  dropdownItemText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  dropdownItemCount: {
+    fontSize: 12,
     fontWeight: '500',
   },
   priceRow: {
