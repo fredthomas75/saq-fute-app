@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
@@ -21,7 +21,7 @@ import SkeletonLoader from '@/components/SkeletonLoader';
 import FilterBottomSheet, { FilterState } from '@/components/FilterBottomSheet';
 import WineListSort, { sortWines, type SortKey } from '@/components/WineListSort';
 
-const PAGE_SIZE = 50; // API max — backend doesn't support pagination/offset
+const PAGE_SIZE = 20;
 
 
 export default function SearchScreen() {
@@ -37,6 +37,8 @@ export default function SearchScreen() {
   const [results, setResults] = useState<Wine[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreGuard = useRef(false); // synchronous guard to prevent double-fire
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -44,6 +46,7 @@ export default function SearchScreen() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryRef = useRef('');
+  const pageRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -92,18 +95,21 @@ export default function SearchScreen() {
         setTotalCount(cached.count || cached.wines.length);
         setHasSearched(true);
         setLoading(false);
+        pageRef.current = 1;
         return;
       }
     }
 
     setLoading(true);
     setError(null);
+    pageRef.current = 0;
     try {
       const data = await saqApi.search(searchParams);
       setResults(data.wines);
       setTotalCount(data.count || data.wines.length);
       setVipFallback(!!data.vipFallback);
       setHasSearched(true);
+      pageRef.current = 1;
       searchCache.set(cacheKey, data);
       if (queryRef.current && queryRef.current.length >= 2) {
         addEntry(queryRef.current, data.count || data.wines.length);
@@ -115,6 +121,43 @@ export default function SearchScreen() {
       setRefreshing(false);
     }
   }, [filters, t, addEntry, vipMode]);
+
+  // Load more results (infinite scroll)
+  const loadMore = useCallback(async () => {
+    if (loadingMoreGuard.current || loading || results.length >= totalCount) return;
+    loadingMoreGuard.current = true; // synchronous guard
+    const offset = pageRef.current * PAGE_SIZE;
+    setLoadingMore(true);
+    try {
+      const q = queryRef.current?.trim() || '';
+      const isCountrySearch = q.length >= 2 && knownCountries.current.has(q.toLowerCase());
+      const data = await saqApi.search({
+        query: isCountrySearch ? undefined : (q || undefined),
+        country: isCountrySearch ? q : undefined,
+        type: filters.type,
+        onlySale: filters.onlySale || undefined,
+        onlyOrganic: filters.onlyOrganic || undefined,
+        vip: filters.onlyExpert || vipMode || undefined,
+        minPrice: filters.priceMin || undefined,
+        maxPrice: filters.priceMax || undefined,
+        limit: PAGE_SIZE,
+        offset,
+      });
+      if (data.wines.length > 0) {
+        setResults((prev) => {
+          const ids = new Set(prev.map((w) => w.id));
+          const newWines = data.wines.filter((w: Wine) => !ids.has(w.id));
+          return [...prev, ...newWines];
+        });
+        pageRef.current++;
+      }
+    } catch {
+      // Silently fail — user can scroll again to retry
+    } finally {
+      loadingMoreGuard.current = false;
+      setLoadingMore(false);
+    }
+  }, [loading, results.length, totalCount, filters, vipMode]);
 
   // Fetch stats for trending section (cached 30 min)
   useEffect(() => {
@@ -173,6 +216,29 @@ export default function SearchScreen() {
   };
 
   const activeFilterCount = [filters.type, filters.onlySale, filters.onlyOrganic, filters.onlyExpert].filter(Boolean).length;
+
+  // Native DOM scroll listener — backup for infinite scroll on web
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+  useEffect(() => {
+    if (typeof document === 'undefined' || results.length === 0 || results.length >= totalCount) return;
+    const timer = setTimeout(() => {
+      const el = Array.from(document.querySelectorAll('*')).filter(
+        (e): e is HTMLElement => e instanceof HTMLElement &&
+          e.scrollHeight > e.clientHeight + 200 && e.clientHeight > 100 &&
+          ['auto', 'scroll'].includes(getComputedStyle(e).overflowY)
+      ).sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+      if (!el) return;
+      const handler = () => {
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 1.5) {
+          loadMoreRef.current();
+        }
+      };
+      el.addEventListener('scroll', handler, { passive: true });
+      (window as any).__scrollCleanup = () => el.removeEventListener('scroll', handler);
+    }, 300);
+    return () => { clearTimeout(timer); (window as any).__scrollCleanup?.(); };
+  }, [results.length, totalCount]);
 
   // Client-side sort on loaded results
   const sortedResults = useMemo(() => sortWines(results, sortBy), [results, sortBy]);
@@ -355,7 +421,13 @@ export default function SearchScreen() {
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
             onScroll={(e) => {
-              setShowScrollTop(e.nativeEvent.contentOffset.y > 600);
+              const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+              setShowScrollTop(contentOffset.y > 600);
+              // Auto-load more when near bottom
+              const distFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+              if (distFromBottom < layoutMeasurement.height * 1.5) {
+                loadMore();
+              }
             }}
             scrollEventThrottle={200}
             refreshControl={
@@ -368,13 +440,20 @@ export default function SearchScreen() {
               </AnimatedListItem>
             ))}
 
-            {/* Show count info when there are more results than can be displayed */}
+            {/* Footer: loading spinner or count */}
             {results.length < totalCount && (
-              <View style={styles.loadingMore}>
-                <Text style={[styles.loadingMoreText, { color: colors.gray }]}>
-                  {results.length} / {totalCount}
-                </Text>
-              </View>
+              loadingMore ? (
+                <View style={styles.loadingMore}>
+                  <ActivityIndicator size="small" color={colors.burgundy} />
+                  <Text style={[styles.loadingMoreText, { color: colors.gray }]}>{t.common.loading}</Text>
+                </View>
+              ) : (
+                <Pressable onPress={loadMore} style={styles.loadingMore}>
+                  <Text style={[styles.loadingMoreText, { color: colors.burgundy }]}>
+                    {results.length} / {totalCount}
+                  </Text>
+                </Pressable>
+              )
             )}
           </ScrollView>
           {showScrollTop && (
