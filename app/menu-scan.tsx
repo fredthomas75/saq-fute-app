@@ -9,15 +9,47 @@ import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
 
 let ImagePicker: any = null;
-try { ImagePicker = require('expo-image-picker'); } catch {}
-
 let CameraViewComponent: any = null;
 let useCameraPermissions: any = null;
-try {
-  const cam = require('expo-camera');
-  CameraViewComponent = cam.CameraView;
-  useCameraPermissions = cam.useCameraPermissions;
-} catch {}
+
+if (Platform.OS !== 'web') {
+  try { ImagePicker = require('expo-image-picker'); } catch {}
+  try {
+    const cam = require('expo-camera');
+    CameraViewComponent = cam.CameraView;
+    useCameraPermissions = cam.useCameraPermissions;
+  } catch {}
+}
+
+// Web helpers — native HTML file input (reliable on mobile browsers)
+function readFileAsBase64(file: File): Promise<{ uri: string; base64: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      resolve({ uri: dataUrl, base64: dataUrl.split(',')[1] || '' });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function openWebFilePicker(capture?: boolean): Promise<{ uri: string; base64: string } | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    if (capture) input.setAttribute('capture', 'environment');
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) { resolve(null); return; }
+      try { resolve(await readFileAsBase64(file)); } catch { resolve(null); }
+    };
+    const onFocus = () => { setTimeout(() => { if (!input.files?.length) resolve(null); }, 500); };
+    window.addEventListener('focus', onFocus, { once: true });
+    input.click();
+  });
+}
 
 function extractBase64(photo: { base64?: string; uri?: string }): string | null {
   let b64 = photo.base64 || '';
@@ -49,12 +81,39 @@ export default function MenuScanScreen() {
   };
 
   const pickFromGallery = async () => {
+    if (Platform.OS === 'web') {
+      const picked = await openWebFilePicker(false);
+      if (picked) {
+        setImageUri(picked.uri);
+        setMode('result');
+        analyzeImage(picked.base64);
+      }
+      return;
+    }
     if (!ImagePicker) return;
     const res = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.7 as number });
     if (!res.canceled && res.assets[0]) {
       setImageUri(res.assets[0].uri);
       setMode('result');
       analyzeImage(res.assets[0].base64);
+    }
+  };
+
+  const takePhoto = async () => {
+    if (Platform.OS === 'web') {
+      const picked = await openWebFilePicker(true);
+      if (picked) {
+        setImageUri(picked.uri);
+        setMode('result');
+        analyzeImage(picked.base64);
+      }
+      return;
+    }
+    // Native: use camera viewfinder
+    if (CameraViewComponent) {
+      setMode('camera');
+    } else {
+      pickFromGallery();
     }
   };
 
@@ -73,7 +132,7 @@ export default function MenuScanScreen() {
           <Ionicons name="restaurant-outline" size={64} color={COLORS.burgundy} />
           <Text style={styles.pickTitle}>{t.menuScan.title}</Text>
 
-          <Pressable onPress={() => CameraViewComponent ? setMode('camera') : pickFromGallery()} style={styles.pickBtn}>
+          <Pressable onPress={takePhoto} style={styles.pickBtn}>
             <Ionicons name="camera-outline" size={22} color={COLORS.white} />
             <Text style={styles.pickBtnText}>{t.menuScan.takePhoto}</Text>
           </Pressable>
@@ -83,7 +142,7 @@ export default function MenuScanScreen() {
             <Text style={[styles.pickBtnText, styles.pickBtnTextSecondary]}>{t.menuScan.choosePhoto}</Text>
           </Pressable>
 
-          {!ImagePicker && !CameraViewComponent && (
+          {Platform.OS !== 'web' && !ImagePicker && !CameraViewComponent && (
             <Text style={styles.noLib}>{t.menuScan.notInstalled}</Text>
           )}
         </View>

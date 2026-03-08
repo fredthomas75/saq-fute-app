@@ -118,25 +118,39 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
         {/* Price range */}
         <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.priceRange}</Text>
         <View style={styles.priceRow}>
-          <TextInput
-            style={[styles.priceInput, { borderColor: colors.grayLight, color: colors.black, backgroundColor: colors.cream }]}
-            placeholder={t.filters.minPrice}
-            placeholderTextColor={colors.grayLight}
-            keyboardType="numeric"
-            value={filters.priceMin ? String(filters.priceMin) : ''}
-            onChangeText={(v) => setFilters((f) => ({ ...f, priceMin: v ? Number(v) : undefined }))}
-            accessibilityLabel={t.filters.minPrice}
-          />
+          <View style={[styles.priceInputWrap, { borderColor: colors.grayLight, backgroundColor: colors.cream }]}>
+            <Text style={[styles.priceCurrency, { color: colors.gray }]}>$</Text>
+            <TextInput
+              style={[styles.priceInput, { color: colors.black }]}
+              placeholder={t.filters.minPrice}
+              placeholderTextColor={colors.grayLight}
+              keyboardType="numeric"
+              inputMode="numeric"
+              value={filters.priceMin ? String(filters.priceMin) : ''}
+              onChangeText={(v) => {
+                const num = v.replace(/[^0-9]/g, '');
+                setFilters((f) => ({ ...f, priceMin: num ? Number(num) : undefined }));
+              }}
+              accessibilityLabel={t.filters.minPrice}
+            />
+          </View>
           <Text style={[styles.priceSep, { color: colors.gray }]}>—</Text>
-          <TextInput
-            style={[styles.priceInput, { borderColor: colors.grayLight, color: colors.black, backgroundColor: colors.cream }]}
-            placeholder={t.filters.maxPrice}
-            placeholderTextColor={colors.grayLight}
-            keyboardType="numeric"
-            value={filters.priceMax ? String(filters.priceMax) : ''}
-            onChangeText={(v) => setFilters((f) => ({ ...f, priceMax: v ? Number(v) : undefined }))}
-            accessibilityLabel={t.filters.maxPrice}
-          />
+          <View style={[styles.priceInputWrap, { borderColor: colors.grayLight, backgroundColor: colors.cream }]}>
+            <Text style={[styles.priceCurrency, { color: colors.gray }]}>$</Text>
+            <TextInput
+              style={[styles.priceInput, { color: colors.black }]}
+              placeholder={t.filters.maxPrice}
+              placeholderTextColor={colors.grayLight}
+              keyboardType="numeric"
+              inputMode="numeric"
+              value={filters.priceMax ? String(filters.priceMax) : ''}
+              onChangeText={(v) => {
+                const num = v.replace(/[^0-9]/g, '');
+                setFilters((f) => ({ ...f, priceMax: num ? Number(num) : undefined }));
+              }}
+              accessibilityLabel={t.filters.maxPrice}
+            />
+          </View>
         </View>
 
         {/* Toggle options */}
@@ -249,17 +263,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  priceInput: {
+  priceInputWrap: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: RADIUS.sm,
     paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.sm,
+    minWidth: 0,
+  },
+  priceCurrency: {
     fontSize: 15,
-    textAlign: 'center',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  priceInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: SPACING.sm,
+    minWidth: 0,
   },
   priceSep: {
     fontSize: 16,
+    flexShrink: 0,
   },
   toggleList: {
     gap: 2,

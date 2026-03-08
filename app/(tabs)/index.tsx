@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,7 @@ import AnimatedListItem from '@/components/AnimatedListItem';
 import EmptyState from '@/components/EmptyState';
 import SkeletonLoader from '@/components/SkeletonLoader';
 import FilterBottomSheet, { FilterState } from '@/components/FilterBottomSheet';
+import WineListSort, { sortWines, type SortKey } from '@/components/WineListSort';
 
 const CARD_HEIGHT = 170;
 const PAGE_SIZE = 20;
@@ -50,6 +51,7 @@ export default function SearchScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [vipFallback, setVipFallback] = useState(false);
+  const [sortBy, setSortBy] = useState<SortKey>('default');
 
   // Cleanup search timer on unmount
   useEffect(() => {
@@ -82,7 +84,6 @@ export default function SearchScreen() {
       minPrice: filters.priceMin || undefined,
       maxPrice: filters.priceMax || undefined,
       limit: PAGE_SIZE,
-      lang: language,
     };
 
     // Check cache first (unless forced refresh)
@@ -144,7 +145,6 @@ export default function SearchScreen() {
         maxPrice: filters.priceMax || undefined,
         limit: PAGE_SIZE,
         offset,
-        lang: language,
       };
       const data = await saqApi.search(searchParams);
       if (data.wines.length > 0) {
@@ -219,6 +219,9 @@ export default function SearchScreen() {
   };
 
   const activeFilterCount = [filters.type, filters.onlySale, filters.onlyOrganic, filters.onlyExpert].filter(Boolean).length;
+
+  // Client-side sort on loaded results
+  const sortedResults = useMemo(() => sortWines(results, sortBy), [results, sortBy]);
 
   // FlatList optimization: fixed item height
   const getItemLayout = useCallback((_: any, index: number) => ({
@@ -393,9 +396,15 @@ export default function SearchScreen() {
 
       {!loading && results.length > 0 && (
         <>
+          <WineListSort
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            showTypeFilter={false}
+            resultCount={results.length}
+          />
           <FlatList
             ref={flatListRef}
-            data={results}
+            data={sortedResults}
             keyExtractor={(item) => item.id}
             renderItem={({ item, index }) => (
               <AnimatedListItem index={index}>
