@@ -21,7 +21,6 @@ import SkeletonLoader from '@/components/SkeletonLoader';
 import FilterBottomSheet, { FilterState } from '@/components/FilterBottomSheet';
 import WineListSort, { sortWines, type SortKey } from '@/components/WineListSort';
 
-const CARD_HEIGHT = 180;
 const PAGE_SIZE = 20;
 
 export default function SearchScreen() {
@@ -223,13 +222,6 @@ export default function SearchScreen() {
   // Client-side sort on loaded results
   const sortedResults = useMemo(() => sortWines(results, sortBy), [results, sortBy]);
 
-  // FlatList layout hint for virtualization (enables proper scroll sizing on web)
-  const getItemLayout = useCallback((_: any, index: number) => ({
-    length: CARD_HEIGHT,
-    offset: CARD_HEIGHT * index,
-    index,
-  }), []);
-
   return (
     <View style={[styles.container, { backgroundColor: colors.cream }]}>
       {/* Search row with filter button */}
@@ -413,19 +405,16 @@ export default function SearchScreen() {
             )}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
-            getItemLayout={getItemLayout}
-            maxToRenderPerBatch={8}
-            windowSize={5}
+            initialNumToRender={20}
+            maxToRenderPerBatch={20}
+            windowSize={21}
+            onEndReached={loadMore}
             onEndReachedThreshold={0.5}
             onScroll={(e) => {
-              const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+              const { contentOffset } = e.nativeEvent;
               setShowScrollTop(contentOffset.y > 600);
-              // Reliable infinite scroll for web: trigger loadMore when near bottom
-              if (contentSize.height - contentOffset.y - layoutMeasurement.height < layoutMeasurement.height * 0.5) {
-                loadMore();
-              }
             }}
-            scrollEventThrottle={200}
+            scrollEventThrottle={300}
             ListFooterComponent={
               loadingMore ? (
                 <View style={styles.loadingMore}>
