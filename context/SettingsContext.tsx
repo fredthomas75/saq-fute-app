@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Localization from 'expo-localization';
 import type { Locale } from '@/i18n';
@@ -120,17 +120,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [settings, persist]
   );
 
+  const value = useMemo(() => ({
+    ...settings,
+    setLanguage,
+    setTheme,
+    setNotifications,
+    toggleVipMode,
+    loaded,
+  }), [settings, setLanguage, setTheme, setNotifications, toggleVipMode, loaded]);
+
   return (
-    <SettingsContext.Provider
-      value={{
-        ...settings,
-        setLanguage,
-        setTheme,
-        setNotifications,
-        toggleVipMode,
-        loaded,
-      }}
-    >
+    <SettingsContext.Provider value={value}>
       {children}
     </SettingsContext.Provider>
   );

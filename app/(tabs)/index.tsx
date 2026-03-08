@@ -23,6 +23,16 @@ import WineListSort, { sortWines, type SortKey } from '@/components/WineListSort
 
 const PAGE_SIZE = 20;
 
+// Find the main scrollable container in DOM (web only)
+function findScrollContainer(): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+  return Array.from(document.querySelectorAll('*')).filter(
+    (e): e is HTMLElement => e instanceof HTMLElement &&
+      e.scrollHeight > e.clientHeight + 200 && e.clientHeight > 100 &&
+      ['auto', 'scroll'].includes(getComputedStyle(e).overflowY)
+  ).sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || null;
+}
+
 
 export default function SearchScreen() {
   const t = useTranslation();
@@ -49,6 +59,7 @@ export default function SearchScreen() {
   const pageRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const scrollElRef = useRef<HTMLElement | null>(null); // cached DOM scroll container
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [vipFallback, setVipFallback] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>('default');
@@ -69,12 +80,11 @@ export default function SearchScreen() {
     }
   }, [stats]);
 
-  const doSearch = useCallback(async (forceRefresh = false) => {
+  // Shared search params builder — used by both doSearch and loadMore
+  const buildSearchParams = useCallback((offset?: number) => {
     const q = queryRef.current?.trim() || '';
-    // If query matches a known country name, use the country param for exact filtering
     const isCountrySearch = q.length >= 2 && knownCountries.current.has(q.toLowerCase());
-
-    const searchParams: Record<string, string | number | boolean | undefined> = {
+    return {
       query: isCountrySearch ? undefined : (q || undefined),
       country: isCountrySearch ? q : undefined,
       type: filters.type,
@@ -84,7 +94,12 @@ export default function SearchScreen() {
       minPrice: filters.priceMin || undefined,
       maxPrice: filters.priceMax || undefined,
       limit: PAGE_SIZE,
-    };
+      ...(offset !== undefined && { offset }),
+    } as Record<string, string | number | boolean | undefined>;
+  }, [filters, vipMode]);
+
+  const doSearch = useCallback(async (forceRefresh = false) => {
+    const searchParams = buildSearchParams();
 
     // Check cache first (unless forced refresh)
     const cacheKey = SearchCache.makeKey(searchParams);
@@ -120,29 +135,24 @@ export default function SearchScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filters, t, addEntry, vipMode]);
+  }, [buildSearchParams, t, addEntry]);
 
-  // Load more results (infinite scroll)
+  // Refs for loadMore to read without causing re-creation of the callback
+  const resultsLenRef = useRef(results.length);
+  resultsLenRef.current = results.length;
+  const totalCountRef = useRef(totalCount);
+  totalCountRef.current = totalCount;
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+
+  // Load more results (infinite scroll) — stable callback via refs
   const loadMore = useCallback(async () => {
-    if (loadingMoreGuard.current || loading || results.length >= totalCount) return;
+    if (loadingMoreGuard.current || loadingRef.current || resultsLenRef.current >= totalCountRef.current) return;
     loadingMoreGuard.current = true; // synchronous guard
     const offset = pageRef.current * PAGE_SIZE;
     setLoadingMore(true);
     try {
-      const q = queryRef.current?.trim() || '';
-      const isCountrySearch = q.length >= 2 && knownCountries.current.has(q.toLowerCase());
-      const data = await saqApi.search({
-        query: isCountrySearch ? undefined : (q || undefined),
-        country: isCountrySearch ? q : undefined,
-        type: filters.type,
-        onlySale: filters.onlySale || undefined,
-        onlyOrganic: filters.onlyOrganic || undefined,
-        vip: filters.onlyExpert || vipMode || undefined,
-        minPrice: filters.priceMin || undefined,
-        maxPrice: filters.priceMax || undefined,
-        limit: PAGE_SIZE,
-        offset,
-      });
+      const data = await saqApi.search(buildSearchParams(offset));
       if (data.wines.length > 0) {
         setResults((prev) => {
           const ids = new Set(prev.map((w) => w.id));
@@ -157,7 +167,7 @@ export default function SearchScreen() {
       loadingMoreGuard.current = false;
       setLoadingMore(false);
     }
-  }, [loading, results.length, totalCount, filters, vipMode]);
+  }, [buildSearchParams]);
 
   // Fetch stats for trending section (cached 30 min)
   useEffect(() => {
@@ -218,16 +228,17 @@ export default function SearchScreen() {
   const activeFilterCount = [filters.type, filters.onlySale, filters.onlyOrganic, filters.onlyExpert].filter(Boolean).length;
 
   // Native DOM scroll listener — backup for infinite scroll on web
+  // Uses cached scroll container ref to avoid expensive querySelectorAll('*') every time
   const loadMoreRef = useRef(loadMore);
   loadMoreRef.current = loadMore;
   useEffect(() => {
     if (typeof document === 'undefined' || results.length === 0 || results.length >= totalCount) return;
     const timer = setTimeout(() => {
-      const el = Array.from(document.querySelectorAll('*')).filter(
-        (e): e is HTMLElement => e instanceof HTMLElement &&
-          e.scrollHeight > e.clientHeight + 200 && e.clientHeight > 100 &&
-          ['auto', 'scroll'].includes(getComputedStyle(e).overflowY)
-      ).sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+      // Reuse cached element if still in DOM, otherwise find it once
+      if (!scrollElRef.current || !document.body.contains(scrollElRef.current)) {
+        scrollElRef.current = findScrollContainer();
+      }
+      const el = scrollElRef.current;
       if (!el) return;
       const handler = () => {
         if (el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 1.5) {
@@ -239,6 +250,16 @@ export default function SearchScreen() {
     }, 300);
     return () => { clearTimeout(timer); (window as any).__scrollCleanup?.(); };
   }, [results.length, totalCount]);
+
+  // Memoized scroll handler — avoids re-creating on every render
+  const handleScroll = useCallback((e: any) => {
+    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+    setShowScrollTop(contentOffset.y > 600);
+    const distFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+    if (distFromBottom < layoutMeasurement.height * 1.5) {
+      loadMore();
+    }
+  }, [loadMore]);
 
   // Client-side sort on loaded results
   const sortedResults = useMemo(() => sortWines(results, sortBy), [results, sortBy]);
@@ -420,22 +441,14 @@ export default function SearchScreen() {
             style={{ flex: 1 }}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
-            onScroll={(e) => {
-              const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
-              setShowScrollTop(contentOffset.y > 600);
-              // Auto-load more when near bottom
-              const distFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
-              if (distFromBottom < layoutMeasurement.height * 1.5) {
-                loadMore();
-              }
-            }}
+            onScroll={handleScroll}
             scrollEventThrottle={200}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.burgundy} />
             }
           >
             {sortedResults.map((item, index) => (
-              <AnimatedListItem key={item.id} index={index}>
+              <AnimatedListItem key={item.id} index={index} skipAnimation={index >= PAGE_SIZE}>
                 <WineCard wine={item} />
               </AnimatedListItem>
             ))}

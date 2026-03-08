@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Wine } from '@/types/wine';
 import { useAuth, registerMergeCallback } from '@/context/AuthContext';
@@ -136,8 +136,16 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     if (user) clearWishlistCloud(user.id).catch(() => {});
   }, [user]);
 
+  const value = useMemo(() => ({
+    wishlist: state.wishlist,
+    addToWishlist,
+    removeFromWishlist,
+    isInWishlist,
+    clearAll,
+  }), [state.wishlist, addToWishlist, removeFromWishlist, isInWishlist, clearAll]);
+
   return (
-    <WishlistContext.Provider value={{ wishlist: state.wishlist, addToWishlist, removeFromWishlist, isInWishlist, clearAll }}>
+    <WishlistContext.Provider value={value}>
       {children}
     </WishlistContext.Provider>
   );

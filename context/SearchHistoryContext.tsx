@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@saq_fute_search_history';
@@ -80,8 +80,15 @@ export function SearchHistoryProvider({ children }: { children: React.ReactNode 
     dispatch({ type: 'CLEAR' });
   }, []);
 
+  const value = useMemo(() => ({
+    history: state.history,
+    addEntry,
+    removeEntry,
+    clearHistory,
+  }), [state.history, addEntry, removeEntry, clearHistory]);
+
   return (
-    <SearchHistoryContext.Provider value={{ history: state.history, addEntry, removeEntry, clearHistory }}>
+    <SearchHistoryContext.Provider value={value}>
       {children}
     </SearchHistoryContext.Provider>
   );

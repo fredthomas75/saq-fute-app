@@ -194,21 +194,21 @@ export function CellarProvider({ children }: { children: React.ReactNode }) {
     if (user) clearCellarCloud(user.id).catch(() => {});
   }, [user]);
 
+  const value = useMemo(() => ({
+    cellar: state.cellar,
+    addToCellar,
+    removeFromCellar,
+    updateQuantity,
+    updateNotes,
+    isInCellar,
+    getCellarQuantity,
+    totalBottles,
+    totalValue,
+    clearCellar,
+  }), [state.cellar, addToCellar, removeFromCellar, updateQuantity, updateNotes, isInCellar, getCellarQuantity, totalBottles, totalValue, clearCellar]);
+
   return (
-    <CellarContext.Provider
-      value={{
-        cellar: state.cellar,
-        addToCellar,
-        removeFromCellar,
-        updateQuantity,
-        updateNotes,
-        isInCellar,
-        getCellarQuantity,
-        totalBottles,
-        totalValue,
-        clearCellar,
-      }}
-    >
+    <CellarContext.Provider value={value}>
       {children}
     </CellarContext.Provider>
   );

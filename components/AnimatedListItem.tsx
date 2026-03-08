@@ -4,13 +4,16 @@ import { Animated } from 'react-native';
 interface Props {
   index: number;
   children: React.ReactNode;
+  /** Skip entrance animation (e.g. for infinite-scroll loaded items) */
+  skipAnimation?: boolean;
 }
 
-export default function AnimatedListItem({ index, children }: Props) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
+export default function AnimatedListItem({ index, children, skipAnimation }: Props) {
+  const opacity = useRef(new Animated.Value(skipAnimation ? 1 : 0)).current;
+  const translateY = useRef(new Animated.Value(skipAnimation ? 0 : 20)).current;
 
   useEffect(() => {
+    if (skipAnimation) return;
     const delay = Math.min(index * 60, 300); // Cap at 300ms
     Animated.parallel([
       Animated.timing(opacity, {
@@ -26,7 +29,7 @@ export default function AnimatedListItem({ index, children }: Props) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [index]);
+  }, [index, skipAnimation]);
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }] }}>

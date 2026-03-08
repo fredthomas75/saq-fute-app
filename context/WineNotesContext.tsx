@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth, registerMergeCallback } from '@/context/AuthContext';
 import { debouncedSync, pushWineNotes, deleteNoteCloud, clearNotesCloud, mergeWineNotes } from '@/services/sync';
@@ -128,8 +128,17 @@ export function WineNotesProvider({ children }: { children: React.ReactNode }) {
     if (user) clearNotesCloud(user.id).catch(() => {});
   }, [user]);
 
+  const value = useMemo(() => ({
+    notes: state.notes,
+    setNote,
+    deleteNote,
+    getNote,
+    hasNote,
+    clearAll,
+  }), [state.notes, setNote, deleteNote, getNote, hasNote, clearAll]);
+
   return (
-    <WineNotesContext.Provider value={{ notes: state.notes, setNote, deleteNote, getNote, hasNote, clearAll }}>
+    <WineNotesContext.Provider value={value}>
       {children}
     </WineNotesContext.Provider>
   );

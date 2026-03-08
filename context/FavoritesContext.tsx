@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Wine } from '@/types/wine';
 import { useAuth, registerMergeCallback } from '@/context/AuthContext';
@@ -137,8 +137,17 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     if (user) clearFavoritesCloud(user.id).catch(() => {});
   }, [user]);
 
+  const value = useMemo(() => ({
+    favorites: state.favorites,
+    loaded: state.loaded,
+    addFavorite,
+    removeFavorite,
+    isFavorite,
+    clearAll,
+  }), [state.favorites, state.loaded, addFavorite, removeFavorite, isFavorite, clearAll]);
+
   return (
-    <FavoritesContext.Provider value={{ favorites: state.favorites, loaded: state.loaded, addFavorite, removeFavorite, isFavorite, clearAll }}>
+    <FavoritesContext.Provider value={value}>
       {children}
     </FavoritesContext.Provider>
   );
