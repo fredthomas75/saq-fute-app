@@ -25,22 +25,36 @@ export default function SearchBar({ value, onChangeText, onSubmit, placeholder =
     if (!SpeechRecognition) return;
 
     hapticLight();
-    const recognition = new SpeechRecognition();
-    recognition.lang = language === 'en' ? 'en-CA' : 'fr-CA';
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = language === 'en' ? 'en-CA' : 'fr-CA';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
 
-    recognition.onstart = () => setIsListening(true);
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = () => setIsListening(false);
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = (e: any) => {
+        setIsListening(false);
+        if (e.error === 'not-allowed') {
+          alert(language === 'en' ? 'Microphone access denied. Please allow it in browser settings.' : 'Accès au micro refusé. Veuillez l\'autoriser dans les paramètres du navigateur.');
+        }
+      };
 
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      onChangeText(transcript);
-      onSubmit?.();
-    };
+      recognition.onresult = (event: any) => {
+        const result = event.results[event.results.length - 1];
+        const transcript = result[0].transcript;
+        onChangeText(transcript);
+        // Only trigger search when result is final
+        if (result.isFinal) {
+          onSubmit?.();
+        }
+      };
 
-    recognition.start();
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
   }, [onChangeText, onSubmit, language]);
 
   const hasSpeech = Platform.OS === 'web' && typeof window !== 'undefined' &&

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
@@ -22,6 +22,7 @@ import FilterBottomSheet, { FilterState } from '@/components/FilterBottomSheet';
 import WineListSort, { sortWines, type SortKey } from '@/components/WineListSort';
 
 const PAGE_SIZE = 20;
+
 
 export default function SearchScreen() {
   const t = useTranslation();
@@ -47,7 +48,7 @@ export default function SearchScreen() {
   const pageRef = useRef(0);
   const [loadMoreError, setLoadMoreError] = useState(false);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flatListRef = useRef<FlatList>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [vipFallback, setVipFallback] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>('default');
@@ -222,6 +223,38 @@ export default function SearchScreen() {
   // Client-side sort on loaded results
   const sortedResults = useMemo(() => sortWines(results, sortBy), [results, sortBy]);
 
+  // Native DOM scroll listener for reliable infinite scroll on web
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+  useEffect(() => {
+    if (typeof document === 'undefined' || results.length === 0 || results.length >= totalCount) return;
+    // Find the scrollable wine list container (largest scrollable element on page)
+    const timer = setTimeout(() => {
+      const candidates = Array.from(document.querySelectorAll('*')).filter(
+        (el): el is HTMLElement => el instanceof HTMLElement &&
+          el.scrollHeight > el.clientHeight + 200 && el.clientHeight > 100 &&
+          (getComputedStyle(el).overflow === 'auto' || getComputedStyle(el).overflowY === 'auto' ||
+           getComputedStyle(el).overflow === 'scroll' || getComputedStyle(el).overflowY === 'scroll')
+      );
+      const scrollable = candidates.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+      if (!scrollable) return;
+
+      const handler = () => {
+        const distFromBottom = scrollable.scrollHeight - scrollable.scrollTop - scrollable.clientHeight;
+        if (distFromBottom < scrollable.clientHeight * 1.5) {
+          loadMoreRef.current();
+        }
+      };
+      scrollable.addEventListener('scroll', handler, { passive: true });
+      // Store for cleanup
+      (window as any).__scrollCleanup = () => scrollable.removeEventListener('scroll', handler);
+    }, 300); // small delay to let DOM settle
+    return () => {
+      clearTimeout(timer);
+      (window as any).__scrollCleanup?.();
+    };
+  }, [results.length, totalCount]); // re-attach when results change
+
   return (
     <View style={[styles.container, { backgroundColor: colors.cream }]}>
       {/* Search row with filter button */}
@@ -394,28 +427,33 @@ export default function SearchScreen() {
             showTypeFilter={false}
             resultCount={totalCount}
           />
-          <FlatList
-            ref={flatListRef}
-            data={sortedResults}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => (
-              <AnimatedListItem index={index}>
-                <WineCard wine={item} />
-              </AnimatedListItem>
-            )}
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
-            initialNumToRender={20}
-            maxToRenderPerBatch={20}
-            windowSize={21}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
             onScroll={(e) => {
-              const { contentOffset } = e.nativeEvent;
+              const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
               setShowScrollTop(contentOffset.y > 600);
+              // Auto-load more when within 1.5 screen heights of the bottom
+              const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+              if (distanceFromBottom < layoutMeasurement.height * 1.5) {
+                loadMore();
+              }
             }}
-            scrollEventThrottle={300}
-            ListFooterComponent={
+            scrollEventThrottle={200}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.burgundy} />
+            }
+          >
+            {sortedResults.map((item, index) => (
+              <AnimatedListItem key={item.id} index={index}>
+                <WineCard wine={item} />
+              </AnimatedListItem>
+            ))}
+
+            {/* Footer: loading indicator, error retry, or load more button */}
+            {results.length < totalCount && (
               loadingMore ? (
                 <View style={styles.loadingMore}>
                   <ActivityIndicator size="small" color={colors.burgundy} />
@@ -426,17 +464,18 @@ export default function SearchScreen() {
                   <Ionicons name="refresh-outline" size={18} color={colors.burgundy} />
                   <Text style={[styles.loadingMoreText, { color: colors.burgundy, fontWeight: '600' }]}>{t.common.retry}</Text>
                 </Pressable>
-              ) : results.length < totalCount ? (
-                <Text style={styles.loadingMoreText}>{results.length} / {totalCount}</Text>
-              ) : null
-            }
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.burgundy} />
-            }
-          />
+              ) : (
+                <Pressable onPress={loadMore} style={styles.loadingMore}>
+                  <Text style={[styles.loadingMoreText, { color: colors.burgundy }]}>
+                    {results.length} / {totalCount}
+                  </Text>
+                </Pressable>
+              )
+            )}
+          </ScrollView>
           {showScrollTop && (
             <Pressable
-              onPress={() => { flatListRef.current?.scrollToOffset({ offset: 0, animated: true }); }}
+              onPress={() => { scrollRef.current?.scrollTo({ y: 0, animated: true }); }}
               style={styles.scrollTopFab}
               accessibilityLabel="Scroll to top"
             >
