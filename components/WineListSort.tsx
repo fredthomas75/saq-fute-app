@@ -20,12 +20,12 @@ const SORT_OPTIONS: { key: SortKey; icon: string }[] = [
   { key: 'price_asc', icon: 'arrow-up' },
   { key: 'price_desc', icon: 'arrow-down' },
   { key: 'name', icon: 'text' },
-  { key: 'rating', icon: 'star' },
+  { key: 'rating', icon: 'trophy' },
 ];
 
 const WINE_TYPES = ['Rouge', 'Blanc', 'Rosé', 'Mousseux'];
 
-export function sortWines<T extends { price: number; name: string; maxExpertScore?: number }>(
+export function sortWines<T extends { price: number; name: string; dealScore?: number; maxExpertScore?: number }>(
   wines: T[],
   sortBy: SortKey,
 ): T[] {
@@ -36,11 +36,12 @@ export function sortWines<T extends { price: number; name: string; maxExpertScor
       case 'price_desc': return b.price - a.price;
       case 'name': return a.name.localeCompare(b.name);
       case 'rating': {
-        const aScore = a.maxExpertScore || 0;
-        const bScore = b.maxExpertScore || 0;
-        if (aScore >= 90 && bScore < 90) return -1;
-        if (bScore >= 90 && aScore < 90) return 1;
-        return bScore - aScore;
+        // Primary: dealScore (available on all wines, the app's Q/P metric)
+        const aDeal = a.dealScore || 0;
+        const bDeal = b.dealScore || 0;
+        if (aDeal !== bDeal) return bDeal - aDeal;
+        // Tiebreaker: expert score
+        return (b.maxExpertScore || 0) - (a.maxExpertScore || 0);
       }
       default: return 0;
     }

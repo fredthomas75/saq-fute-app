@@ -258,7 +258,7 @@ export const en: typeof fr = {
     priceDesc: 'Price ↓',
     name: 'Name',
     bestDeal: 'Deal',
-    rating: 'Rating',
+    rating: 'Q/P',
     all: 'All',
   },
 
@@ -385,7 +385,6 @@ export const en: typeof fr = {
     signInDescription: 'Sign in to sync your data across devices',
     signInWithGoogle: 'Continue with Google',
     signInWithApple: 'Continue with Apple',
-    comingSoon: 'Coming soon',
     signedInAs: 'Signed in as',
     signOut: 'Sign out',
     signOutConfirm: 'Sign out?',
