@@ -22,7 +22,7 @@ export const en: typeof fr = {
     expertPick: '⭐ 90+',
     filters: 'Filters',
     trending: 'Trends',
-    totalWines: 'wines in catalog',
+    totalWines: 'available wines',
     onSaleCount: 'on sale',
     organicCount: 'organic',
     topCountries: 'Popular countries',

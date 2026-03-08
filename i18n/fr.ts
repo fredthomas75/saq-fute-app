@@ -20,7 +20,7 @@ export const fr = {
     expertPick: '⭐ 90+',
     filters: 'Filtres',
     trending: 'Tendances',
-    totalWines: 'vins au catalogue',
+    totalWines: 'vins disponibles',
     onSaleCount: 'en promo',
     organicCount: 'bio',
     topCountries: 'Pays populaires',
