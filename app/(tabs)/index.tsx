@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
@@ -21,7 +21,7 @@ import SkeletonLoader from '@/components/SkeletonLoader';
 import FilterBottomSheet, { FilterState } from '@/components/FilterBottomSheet';
 import WineListSort, { sortWines, type SortKey } from '@/components/WineListSort';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50; // API max — backend doesn't support pagination/offset
 
 
 export default function SearchScreen() {
@@ -37,7 +37,6 @@ export default function SearchScreen() {
   const [results, setResults] = useState<Wine[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -45,8 +44,6 @@ export default function SearchScreen() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryRef = useRef('');
-  const pageRef = useRef(0);
-  const [loadMoreError, setLoadMoreError] = useState(false);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -95,21 +92,18 @@ export default function SearchScreen() {
         setTotalCount(cached.count || cached.wines.length);
         setHasSearched(true);
         setLoading(false);
-        pageRef.current = 1;
         return;
       }
     }
 
     setLoading(true);
     setError(null);
-    pageRef.current = 0;
     try {
       const data = await saqApi.search(searchParams);
       setResults(data.wines);
       setTotalCount(data.count || data.wines.length);
       setVipFallback(!!data.vipFallback);
       setHasSearched(true);
-      pageRef.current = 1;
       searchCache.set(cacheKey, data);
       if (queryRef.current && queryRef.current.length >= 2) {
         addEntry(queryRef.current, data.count || data.wines.length);
@@ -121,46 +115,6 @@ export default function SearchScreen() {
       setRefreshing(false);
     }
   }, [filters, t, addEntry, vipMode]);
-
-  // Load more results (infinite scroll)
-  const loadMore = useCallback(async () => {
-    if (loadingMore || loading) return;
-    if (results.length >= totalCount) return; // All results loaded
-    const offset = pageRef.current * PAGE_SIZE;
-
-    setLoadingMore(true);
-    setLoadMoreError(false);
-    try {
-      const q = queryRef.current?.trim() || '';
-      const isCountrySearch = q.length >= 2 && knownCountries.current.has(q.toLowerCase());
-
-      const searchParams: Record<string, string | number | boolean | undefined> = {
-        query: isCountrySearch ? undefined : (q || undefined),
-        country: isCountrySearch ? q : undefined,
-        type: filters.type,
-        onlySale: filters.onlySale || undefined,
-        onlyOrganic: filters.onlyOrganic || undefined,
-        vip: filters.onlyExpert || vipMode || undefined,
-        minPrice: filters.priceMin || undefined,
-        maxPrice: filters.priceMax || undefined,
-        limit: PAGE_SIZE,
-        offset,
-      };
-      const data = await saqApi.search(searchParams);
-      if (data.wines.length > 0) {
-        setResults((prev) => {
-          const ids = new Set(prev.map((w) => w.id));
-          const newWines = data.wines.filter((w: Wine) => !ids.has(w.id));
-          return [...prev, ...newWines];
-        });
-        pageRef.current++;
-      }
-    } catch {
-      setLoadMoreError(true);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [loadingMore, loading, results.length, totalCount, filters, vipMode]);
 
   // Fetch stats for trending section (cached 30 min)
   useEffect(() => {
@@ -222,38 +176,6 @@ export default function SearchScreen() {
 
   // Client-side sort on loaded results
   const sortedResults = useMemo(() => sortWines(results, sortBy), [results, sortBy]);
-
-  // Native DOM scroll listener for reliable infinite scroll on web
-  const loadMoreRef = useRef(loadMore);
-  loadMoreRef.current = loadMore;
-  useEffect(() => {
-    if (typeof document === 'undefined' || results.length === 0 || results.length >= totalCount) return;
-    // Find the scrollable wine list container (largest scrollable element on page)
-    const timer = setTimeout(() => {
-      const candidates = Array.from(document.querySelectorAll('*')).filter(
-        (el): el is HTMLElement => el instanceof HTMLElement &&
-          el.scrollHeight > el.clientHeight + 200 && el.clientHeight > 100 &&
-          (getComputedStyle(el).overflow === 'auto' || getComputedStyle(el).overflowY === 'auto' ||
-           getComputedStyle(el).overflow === 'scroll' || getComputedStyle(el).overflowY === 'scroll')
-      );
-      const scrollable = candidates.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
-      if (!scrollable) return;
-
-      const handler = () => {
-        const distFromBottom = scrollable.scrollHeight - scrollable.scrollTop - scrollable.clientHeight;
-        if (distFromBottom < scrollable.clientHeight * 1.5) {
-          loadMoreRef.current();
-        }
-      };
-      scrollable.addEventListener('scroll', handler, { passive: true });
-      // Store for cleanup
-      (window as any).__scrollCleanup = () => scrollable.removeEventListener('scroll', handler);
-    }, 300); // small delay to let DOM settle
-    return () => {
-      clearTimeout(timer);
-      (window as any).__scrollCleanup?.();
-    };
-  }, [results.length, totalCount]); // re-attach when results change
 
   return (
     <View style={[styles.container, { backgroundColor: colors.cream }]}>
@@ -433,13 +355,7 @@ export default function SearchScreen() {
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
             onScroll={(e) => {
-              const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
-              setShowScrollTop(contentOffset.y > 600);
-              // Auto-load more when within 1.5 screen heights of the bottom
-              const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
-              if (distanceFromBottom < layoutMeasurement.height * 1.5) {
-                loadMore();
-              }
+              setShowScrollTop(e.nativeEvent.contentOffset.y > 600);
             }}
             scrollEventThrottle={200}
             refreshControl={
@@ -452,25 +368,13 @@ export default function SearchScreen() {
               </AnimatedListItem>
             ))}
 
-            {/* Footer: loading indicator, error retry, or load more button */}
+            {/* Show count info when there are more results than can be displayed */}
             {results.length < totalCount && (
-              loadingMore ? (
-                <View style={styles.loadingMore}>
-                  <ActivityIndicator size="small" color={colors.burgundy} />
-                  <Text style={[styles.loadingMoreText, { color: colors.gray }]}>{t.common.loading}</Text>
-                </View>
-              ) : loadMoreError ? (
-                <Pressable onPress={loadMore} style={styles.loadingMore}>
-                  <Ionicons name="refresh-outline" size={18} color={colors.burgundy} />
-                  <Text style={[styles.loadingMoreText, { color: colors.burgundy, fontWeight: '600' }]}>{t.common.retry}</Text>
-                </Pressable>
-              ) : (
-                <Pressable onPress={loadMore} style={styles.loadingMore}>
-                  <Text style={[styles.loadingMoreText, { color: colors.burgundy }]}>
-                    {results.length} / {totalCount}
-                  </Text>
-                </Pressable>
-              )
+              <View style={styles.loadingMore}>
+                <Text style={[styles.loadingMoreText, { color: colors.gray }]}>
+                  {results.length} / {totalCount}
+                </Text>
+              </View>
             )}
           </ScrollView>
           {showScrollTop && (
