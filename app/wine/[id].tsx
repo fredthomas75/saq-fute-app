@@ -63,7 +63,7 @@ export default function WineDetailScreen() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    saqApi.advice(id).then((data) => {
+    saqApi.advice(id, language).then((data) => {
       if (!data.wine) {
         setError(data.error || 'Wine not found');
         return;
