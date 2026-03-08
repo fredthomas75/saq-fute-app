@@ -256,7 +256,6 @@ export const fr = {
     priceDesc: 'Prix ↓',
     name: 'Nom',
     bestDeal: 'Deal',
-    rating: 'Q/P',
     all: 'Tous',
   },
 
@@ -340,6 +339,8 @@ export const fr = {
     onSale: 'En promo',
     organic: 'Bio',
     expertPick: 'Note 90+',
+    country: 'Pays',
+    allCountries: 'Tous',
     apply: 'Appliquer',
     reset: 'Réinitialiser',
   },

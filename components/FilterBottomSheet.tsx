@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Pressable, Animated, Modal, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, Animated, Modal, TextInput, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { TYPE_COLORS } from '@/constants/wine';
@@ -10,6 +10,7 @@ const WINE_TYPE_KEYS = ['Rouge', 'Blanc', 'Rosé', 'Mousseux'];
 
 export interface FilterState {
   type?: string;
+  country?: string;
   onlySale: boolean;
   onlyOrganic: boolean;
   onlyExpert: boolean;
@@ -22,9 +23,10 @@ interface Props {
   onClose: () => void;
   onApply: (filters: FilterState) => void;
   initialFilters: FilterState;
+  countries?: { country: string; count: number }[];
 }
 
-export default function FilterBottomSheet({ visible, onClose, onApply, initialFilters }: Props) {
+export default function FilterBottomSheet({ visible, onClose, onApply, initialFilters, countries }: Props) {
   const t = useTranslation();
   const colors = useThemeColors();
   const { height: screenHeight } = useWindowDimensions();
@@ -71,6 +73,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
 
   const activeCount = [
     filters.type,
+    filters.country,
     filters.onlySale,
     filters.onlyOrganic,
     filters.onlyExpert,
@@ -114,6 +117,34 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
             );
           })}
         </View>
+
+        {/* Country */}
+        {countries && countries.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.country}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.countryRow}>
+              <Pressable
+                onPress={() => setFilters((f) => ({ ...f, country: undefined }))}
+                style={[styles.countryChip, { backgroundColor: colors.cream, borderColor: colors.grayLight }, !filters.country && { backgroundColor: colors.burgundy, borderColor: colors.burgundy }]}
+              >
+                <Text style={[styles.countryChipText, { color: colors.grayDark }, !filters.country && { color: '#FFFFFF' }]}>{t.filters.allCountries}</Text>
+              </Pressable>
+              {countries.map((c) => {
+                const isActive = filters.country === c.country;
+                return (
+                  <Pressable
+                    key={c.country}
+                    onPress={() => setFilters((f) => ({ ...f, country: f.country === c.country ? undefined : c.country }))}
+                    style={[styles.countryChip, { backgroundColor: colors.cream, borderColor: colors.grayLight }, isActive && { backgroundColor: colors.burgundy, borderColor: colors.burgundy }]}
+                  >
+                    <Text style={[styles.countryChipText, { color: colors.grayDark }, isActive && { color: '#FFFFFF' }]}>{c.country}</Text>
+                    <Text style={[styles.countryCount, { color: colors.gray }, isActive && { color: '#FFFFFF80' }]}>{c.count}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </>
+        )}
 
         {/* Price range */}
         <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.priceRange}</Text>
@@ -257,6 +288,28 @@ const styles = StyleSheet.create({
   typeChipText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  countryRow: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    paddingBottom: 2,
+  },
+  countryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+  },
+  countryChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  countryCount: {
+    fontSize: 10,
+    fontWeight: '500',
   },
   priceRow: {
     flexDirection: 'row',

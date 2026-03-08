@@ -84,9 +84,11 @@ export default function SearchScreen() {
   const buildSearchParams = useCallback((offset?: number) => {
     const q = queryRef.current?.trim() || '';
     const isCountrySearch = q.length >= 2 && knownCountries.current.has(q.toLowerCase());
+    // Country from filter takes priority; if none, fall back to country search detection
+    const country = filters.country || (isCountrySearch ? q : undefined);
     return {
-      query: isCountrySearch ? undefined : (q || undefined),
-      country: isCountrySearch ? q : undefined,
+      query: (isCountrySearch && !filters.country) ? undefined : (q || undefined),
+      country: country || undefined,
       type: filters.type,
       onlySale: filters.onlySale || undefined,
       onlyOrganic: filters.onlyOrganic || undefined,
@@ -225,7 +227,7 @@ export default function SearchScreen() {
     doSearch();
   };
 
-  const activeFilterCount = [filters.type, filters.onlySale, filters.onlyOrganic, filters.onlyExpert].filter(Boolean).length;
+  const activeFilterCount = [filters.type, filters.country, filters.onlySale, filters.onlyOrganic, filters.onlyExpert].filter(Boolean).length;
 
   // Native DOM scroll listener — backup for infinite scroll on web
   // Uses cached scroll container ref to avoid expensive querySelectorAll('*') every time
@@ -487,6 +489,7 @@ export default function SearchScreen() {
         onClose={() => setShowFilters(false)}
         onApply={handleApplyFilters}
         initialFilters={filters}
+        countries={stats?.topCountries}
       />
     </View>
   );

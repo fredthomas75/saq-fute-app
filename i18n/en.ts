@@ -258,7 +258,6 @@ export const en: typeof fr = {
     priceDesc: 'Price ↓',
     name: 'Name',
     bestDeal: 'Deal',
-    rating: 'Q/P',
     all: 'All',
   },
 
@@ -342,6 +341,8 @@ export const en: typeof fr = {
     onSale: 'On sale',
     organic: 'Organic',
     expertPick: 'Rating 90+',
+    country: 'Country',
+    allCountries: 'All',
     apply: 'Apply',
     reset: 'Reset',
   },
