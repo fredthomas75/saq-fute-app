@@ -65,6 +65,7 @@ export default function SearchScreen() {
   const [sortBy, setSortBy] = useState<SortKey>('default');
   const [allResults, setAllResults] = useState<Wine[] | null>(null); // full result set for sorting
   const [loadingAll, setLoadingAll] = useState(false);
+  const [sortedDisplayCount, setSortedDisplayCount] = useState(PAGE_SIZE); // paginate sorted view
 
   // Cleanup search timer on unmount
   useEffect(() => {
@@ -122,6 +123,7 @@ export default function SearchScreen() {
     setLoading(true);
     setError(null);
     setAllResults(null); // clear full cache on new search
+    setSortedDisplayCount(PAGE_SIZE);
     pageRef.current = 0;
     try {
       const data = await saqApi.search(searchParams);
@@ -204,6 +206,7 @@ export default function SearchScreen() {
 
   // Trigger fetchAll when sort is activated and we don't have all results yet
   useEffect(() => {
+    setSortedDisplayCount(PAGE_SIZE); // reset pagination on sort change
     if (sortBy !== 'default' && !allResults && hasSearched && totalCount > results.length && !loadingAll) {
       fetchAllResults();
     }
@@ -292,22 +295,27 @@ export default function SearchScreen() {
   }, [results.length, totalCount]);
 
   // Memoized scroll handler — avoids re-creating on every render
-  // Skip infinite scroll when sort is active (all results already loaded)
   const handleScroll = useCallback((e: any) => {
     const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
     setShowScrollTop(contentOffset.y > 600);
-    if (sortBy !== 'default') return; // all results loaded via fetchAll
     const distFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
     if (distFromBottom < layoutMeasurement.height * 1.5) {
-      loadMore();
+      if (sortBy !== 'default' && allResults) {
+        // Show more sorted results progressively
+        setSortedDisplayCount((c) => Math.min(c + PAGE_SIZE, allResults.length));
+      } else {
+        loadMore();
+      }
     }
-  }, [loadMore, sortBy]);
+  }, [loadMore, sortBy, allResults]);
 
-  // Client-side sort — use allResults when fully loaded, else use partial results
+  // Client-side sort — use allResults when fully loaded, paginate display
   const sortedResults = useMemo(() => {
-    const source = (sortBy !== 'default' && allResults) ? allResults : results;
-    return sortWines(source, sortBy);
-  }, [results, allResults, sortBy]);
+    if (sortBy !== 'default' && allResults) {
+      return sortWines(allResults, sortBy).slice(0, sortedDisplayCount);
+    }
+    return sortWines(results, sortBy);
+  }, [results, allResults, sortBy, sortedDisplayCount]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.cream }]}>
@@ -504,6 +512,13 @@ export default function SearchScreen() {
                 <ActivityIndicator size="small" color={colors.burgundy} />
                 <Text style={[styles.loadingMoreText, { color: colors.gray }]}>{t.common.loading}</Text>
               </View>
+            )}
+            {!loadingAll && sortBy !== 'default' && allResults && sortedDisplayCount < allResults.length && (
+              <Pressable onPress={() => setSortedDisplayCount((c) => Math.min(c + PAGE_SIZE, allResults.length))} style={styles.loadingMore}>
+                <Text style={[styles.loadingMoreText, { color: colors.burgundy }]}>
+                  {sortedDisplayCount} / {allResults.length}
+                </Text>
+              </Pressable>
             )}
             {!loadingAll && sortBy === 'default' && results.length < totalCount && (
               loadingMore ? (
