@@ -70,6 +70,94 @@ function preprocess(text: string): string {
   return out;
 }
 
+/** Strip URLs, emojis, and markdown for clean TTS output */
+function stripForSpeech(text: string): string {
+  let out = text;
+  // Remove markdown links
+  out = out.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  // Remove raw URLs
+  out = out.replace(/https?:\/\/[^\s)>\]]+/g, '');
+  // Remove ** bold
+  out = out.replace(/\*\*/g, '');
+  // Remove common emojis used as section headers
+  out = out.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+  // Collapse whitespace
+  out = out.replace(/\s{2,}/g, ' ').trim();
+  return out;
+}
+
+/** TTS: try ElevenLabs API first (natural voice), fallback to browser Speech API */
+const TTS_API = 'https://saq-fute-api.vercel.app/api/tts';
+
+function SpeakButton({ text, lang }: { text: string; lang: string }) {
+  const [speaking, setSpeaking] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const stop = () => {
+    try {
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) window.speechSynthesis.cancel();
+    } catch {}
+    setSpeaking(false);
+  };
+
+  const speakWithBrowser = (clean: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.lang = lang === 'fr' ? 'fr-CA' : 'en-US';
+    utterance.rate = 0.95;
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    // Pick best available voice
+    const voices = window.speechSynthesis.getVoices();
+    const prefix = lang === 'fr' ? 'fr' : 'en';
+    const matching = voices.filter(v => v.lang.startsWith(prefix));
+    const google = matching.find(v => v.name.includes('Google'));
+    const premium = matching.find(v =>
+      ['Amélie','Amelie','Thomas','Samantha','Karen','Daniel'].some(n => v.name.includes(n))
+    );
+    const best = google || premium || matching.find(v => !v.name.includes('espeak')) || matching[0];
+    if (best) utterance.voice = best;
+    window.speechSynthesis.speak(utterance);
+    setSpeaking(true);
+  };
+
+  const toggle = async () => {
+    if (speaking) { stop(); return; }
+
+    const clean = stripForSpeech(text);
+    if (!clean) return;
+    setSpeaking(true);
+
+    try {
+      // Try ElevenLabs API first
+      const res = await fetch(TTS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: clean, lang }),
+      });
+      if (!res.ok) throw new Error('TTS API error');
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setSpeaking(false); URL.revokeObjectURL(url); audioRef.current = null; };
+      audio.onerror = () => { setSpeaking(false); URL.revokeObjectURL(url); audioRef.current = null; };
+      await audio.play();
+    } catch {
+      // Fallback to browser voices
+      speakWithBrowser(clean);
+    }
+  };
+
+  return (
+    <Pressable onPress={toggle} style={styles.speakBtn} hitSlop={8} accessibilityLabel={speaking ? 'Stop' : 'Listen'} accessibilityRole="button">
+      <Ionicons name={speaking ? 'stop' : 'play'} size={14} color={COLORS.gray} />
+    </Pressable>
+  );
+}
+
 function ThinkingDots() {
   const dot1 = useRef(new Animated.Value(0.3)).current;
   const dot2 = useRef(new Animated.Value(0.3)).current;
@@ -284,21 +372,26 @@ export default function ChatScreen() {
     }
 
     return (
-      <View style={[
-        styles.bubble,
-        isUser
-          ? styles.userBubble
-          : [styles.assistantBubble, { backgroundColor: colors.white }],
-      ]}>
-        {imageUri && (
-          <Image source={{ uri: imageUri }} style={styles.chatImage} resizeMode="cover" />
-        )}
-        {textContent ? (
-          <MessageContent text={textContent} isUser={isUser} textColor={isUser ? undefined : colors.black} />
+      <View>
+        <View style={[
+          styles.bubble,
+          isUser
+            ? styles.userBubble
+            : [styles.assistantBubble, { backgroundColor: colors.white }],
+        ]}>
+          {imageUri && (
+            <Image source={{ uri: imageUri }} style={styles.chatImage} resizeMode="cover" />
+          )}
+          {textContent ? (
+            <MessageContent text={textContent} isUser={isUser} textColor={isUser ? undefined : colors.black} />
+          ) : null}
+        </View>
+        {!isUser && textContent ? (
+          <SpeakButton text={textContent} lang={language} />
         ) : null}
       </View>
     );
-  }, [colors.white, colors.black]);
+  }, [colors.white, colors.black, language]);
 
   return (
     <KeyboardAvoidingView
@@ -493,5 +586,17 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: COLORS.burgundy,
+  },
+  speakBtn: {
+    alignSelf: 'flex-start',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.grayLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: SPACING.sm,
+    marginTop: -4,
+    marginBottom: SPACING.sm,
   },
 });
