@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform, Linking, Animated, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -171,6 +171,17 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Pick 4 random suggestions from the pool on each mount
+  const randomSuggestions = useMemo(() => {
+    const pool = [...t.chat.suggestions];
+    const picked: string[] = [];
+    while (picked.length < 4 && pool.length > 0) {
+      const idx = Math.floor(Math.random() * pool.length);
+      picked.push(pool.splice(idx, 1)[0]);
+    }
+    return picked;
+  }, []);
+
   // Debounced scroll-to-end to avoid rapid calls
   const scrollToEnd = useCallback(() => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
@@ -300,7 +311,7 @@ export default function ChatScreen() {
           <Text style={styles.welcomeTitle}>{t.chat.welcomeTitle}</Text>
           <Text style={styles.welcomeSub}>{t.chat.welcomeSub}</Text>
           <View style={styles.suggestions}>
-            {t.chat.suggestions.map((s, i) => (
+            {randomSuggestions.map((s, i) => (
               <Pressable key={i} onPress={() => send(s)} style={styles.suggestionBtn}>
                 <Text style={styles.suggestionText}>{s}</Text>
               </Pressable>
