@@ -114,6 +114,7 @@ export const fr = {
   favorites: {
     empty: 'Aucun favori',
     emptySub: "Appuie sur le ❤️ d'un vin pour le sauvegarder ici",
+    export: 'Exporter',
   },
 
   wineDetail: {
@@ -134,6 +135,7 @@ export const fr = {
     conservation: 'Conservation',
     pairings: '🍽️ Accords',
     expertRatings: '⭐ Notes experts',
+    similarWines: 'Vins similaires',
     remove: 'Retirer',
     favorite: 'Favori',
     share: 'Partager',
@@ -341,6 +343,10 @@ export const fr = {
     expertPick: 'Note 90+',
     country: 'Pays',
     allCountries: 'Tous',
+    grape: 'Cépage',
+    allGrapes: 'Tous',
+    appellation: 'Appellation / Région',
+    appellationPlaceholder: 'Ex: Bordeaux, Toscane...',
     apply: 'Appliquer',
     reset: 'Réinitialiser',
   },
@@ -378,6 +384,14 @@ export const fr = {
     Angleterre: 'Angleterre', Chine: 'Chine', Japon: 'Japon', Turquie: 'Turquie',
     Inde: 'Inde',
   } as Record<string, string>,
+
+  recentlyViewed: {
+    title: 'Vus récemment',
+  },
+
+  priceAlerts: {
+    title: 'Baisses de prix sur vos favoris',
+  },
 
   auth: {
     sectionTitle: 'Compte',

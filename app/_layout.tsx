@@ -13,6 +13,7 @@ import { CellarProvider } from '@/context/CellarContext';
 
 import { WishlistProvider } from '@/context/WishlistContext';
 import { WineNotesProvider } from '@/context/WineNotesContext';
+import { RecentlyViewedProvider } from '@/context/RecentlyViewedContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { COLORS } from '@/constants/theme';
@@ -90,11 +91,13 @@ export default function RootLayout() {
               <CellarProvider>
                 <WishlistProvider>
                 <WineNotesProvider>
+                <RecentlyViewedProvider>
                   <ErrorBoundaryScreen>
                     <StatusBar style="light" />
                     <OfflineBanner />
                     <StackNavigator />
                   </ErrorBoundaryScreen>
+                </RecentlyViewedProvider>
                 </WineNotesProvider>
                 </WishlistProvider>
               </CellarProvider>

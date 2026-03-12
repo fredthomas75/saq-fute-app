@@ -10,6 +10,7 @@ import { useCellar } from '@/context/CellarContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useWineNotes } from '@/context/WineNotesContext';
 import { useToast } from '@/context/ToastContext';
+import { useRecentlyViewed } from '@/context/RecentlyViewedContext';
 import { useTranslation, useTranslateCountry } from '@/i18n';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { hapticLight, hapticSuccess } from '@/services/haptics';
@@ -17,6 +18,7 @@ import type { Wine } from '@/types/wine';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
 import DealBadge from '@/components/DealBadge';
+import WineCard from '@/components/WineCard';
 
 /**
  * Strip serving-temperature sentences from description text.
@@ -48,7 +50,9 @@ export default function WineDetailScreen() {
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const { getNote, setNote } = useWineNotes();
   const { showToast } = useToast();
+  const { addViewed } = useRecentlyViewed();
   const [wine, setWine] = useState<Wine | null>(null);
+  const [similarWines, setSimilarWines] = useState<Wine[]>([]);
   const [conseil, setConseil] = useState<{ service?: string; carafage?: string; conservation?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +73,28 @@ export default function WineDetailScreen() {
         return;
       }
       setWine(data.wine);
+      addViewed(data.wine);
       // Conseil can be at top-level OR nested inside wine — use whichever exists
       setConseil(data.conseil || (data.wine as any).conseil || null);
+      // Fetch similar wines — try grape first, fall back to type+price only
+      const w = data.wine;
+      const grape = w.grapes?.[0];
+      const minP = Math.round((w.price || 10) * 0.7);
+      const maxP = Math.round((w.price || 30) * 1.3);
+      // API type filter expects French names — reverse-map if translated
+      const typeMap: Record<string, string> = { Red: 'Rouge', White: 'Blanc', Rosé: 'Rosé', Sparkling: 'Mousseux' };
+      const apiType = typeMap[w.type] || w.type;
+      const fetchSimilar = async () => {
+        if (grape) {
+          const sim = await saqApi.search({ type: apiType, grape, minPrice: minP, maxPrice: maxP, limit: 10 } as any);
+          const filtered = sim.wines.filter((sw: Wine) => sw.id !== w.id);
+          if (filtered.length >= 2) { setSimilarWines(filtered.slice(0, 6)); return; }
+        }
+        // Fallback: broader search without grape
+        const sim2 = await saqApi.search({ type: apiType, minPrice: minP, maxPrice: maxP, limit: 10 } as any);
+        setSimilarWines(sim2.wines.filter((sw: Wine) => sw.id !== w.id).slice(0, 6));
+      };
+      fetchSimilar().catch(() => {});
     }).catch((err) => {
       setError(err.message);
     }).finally(() => setLoading(false));
@@ -287,6 +311,18 @@ export default function WineDetailScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* Similar wines */}
+      {similarWines.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.black }]}>{t.wineDetail.similarWines}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: SPACING.md }}>
+            {similarWines.map((sw) => (
+              <WineCard key={sw.id} wine={sw} compact />
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       <View style={{ height: SPACING.xl }} />
 

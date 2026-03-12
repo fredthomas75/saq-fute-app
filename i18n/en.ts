@@ -116,6 +116,7 @@ export const en: typeof fr = {
   favorites: {
     empty: 'No favorites',
     emptySub: 'Tap the ❤️ on a wine to save it here',
+    export: 'Export',
   },
 
   wineDetail: {
@@ -136,6 +137,7 @@ export const en: typeof fr = {
     conservation: 'Storage',
     pairings: '🍽️ Pairings',
     expertRatings: '⭐ Expert Ratings',
+    similarWines: 'Similar wines',
     remove: 'Remove',
     favorite: 'Favorite',
     share: 'Share',
@@ -343,6 +345,10 @@ export const en: typeof fr = {
     expertPick: 'Rating 90+',
     country: 'Country',
     allCountries: 'All',
+    grape: 'Grape',
+    allGrapes: 'All',
+    appellation: 'Appellation / Region',
+    appellationPlaceholder: 'E.g.: Bordeaux, Tuscany...',
     apply: 'Apply',
     reset: 'Reset',
   },
@@ -380,6 +386,14 @@ export const en: typeof fr = {
     Angleterre: 'England', Chine: 'China', Japon: 'Japan', Turquie: 'Turkey',
     Inde: 'India',
   } as Record<string, string>,
+
+  recentlyViewed: {
+    title: 'Recently viewed',
+  },
+
+  priceAlerts: {
+    title: 'Price drops on your favorites',
+  },
 
   auth: {
     sectionTitle: 'Account',

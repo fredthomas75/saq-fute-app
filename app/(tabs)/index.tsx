@@ -12,6 +12,8 @@ import { useTranslation, useTranslateCountry } from '@/i18n';
 import { useSettings } from '@/context/SettingsContext';
 import { hapticSelection } from '@/services/haptics';
 import { useSearchHistory } from '@/context/SearchHistoryContext';
+import { useRecentlyViewed } from '@/context/RecentlyViewedContext';
+import { useFavorites } from '@/context/FavoritesContext';
 import SearchBar from '@/components/SearchBar';
 import VipBanner from '@/components/VipBanner';
 import WineCard from '@/components/WineCard';
@@ -41,6 +43,8 @@ export default function SearchScreen() {
   const router = useRouter();
   const { vipMode, language } = useSettings();
   const { history, addEntry, removeEntry, clearHistory } = useSearchHistory();
+  const { recentWines } = useRecentlyViewed();
+  const { favorites } = useFavorites();
   const params = useLocalSearchParams<{ query?: string }>();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>({ onlySale: false, onlyOrganic: false, onlyExpert: false });
@@ -65,7 +69,10 @@ export default function SearchScreen() {
   const [sortBy, setSortBy] = useState<SortKey>('default');
   const [allResults, setAllResults] = useState<Wine[] | null>(null); // full result set for sorting
   const [loadingAll, setLoadingAll] = useState(false);
+  const loadingAllRef = useRef(false); // sync guard for fetchAll
   const [sortedDisplayCount, setSortedDisplayCount] = useState(PAGE_SIZE); // paginate sorted view
+  const [fetchProgress, setFetchProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const [priceAlerts, setPriceAlerts] = useState<Wine[]>([]);
 
   // Cleanup search timer on unmount
   useEffect(() => {
@@ -89,9 +96,13 @@ export default function SearchScreen() {
     const isCountrySearch = q.length >= 2 && knownCountries.current.has(q.toLowerCase());
     // Country from filter takes priority; if none, fall back to country search detection
     const country = filters.country || (isCountrySearch ? q : undefined);
+    const appellation = filters.appellation?.trim();
+    const baseQuery = (isCountrySearch && !filters.country) ? undefined : (q || undefined);
+    const combinedQuery = [baseQuery, appellation].filter(Boolean).join(' ') || undefined;
     return {
-      query: (isCountrySearch && !filters.country) ? undefined : (q || undefined),
+      query: combinedQuery,
       country: country || undefined,
+      grape: filters.grape || undefined,
       type: filters.type,
       onlySale: filters.onlySale || undefined,
       onlyOrganic: filters.onlyOrganic || undefined,
@@ -176,22 +187,35 @@ export default function SearchScreen() {
     }
   }, [buildSearchParams]);
 
-  // Fetch ALL results when sort is active (API max 200 per batch)
+  // Fetch ALL results when sort is active (API max 200 per batch, parallel)
   const FETCH_ALL_BATCH = 200;
   const fetchAllResults = useCallback(async () => {
-    if (loadingAll) return;
+    if (loadingAllRef.current) return;
+    loadingAllRef.current = true;
     setLoadingAll(true);
     try {
       const baseParams = buildSearchParams();
-      let all: Wine[] = [];
-      let offset = 0;
-      let total = Infinity;
-      while (all.length < total) {
-        const data = await saqApi.search({ ...baseParams, limit: FETCH_ALL_BATCH, offset } as any);
-        total = data.count || data.wines.length;
-        all = [...all, ...data.wines];
-        if (data.wines.length < FETCH_ALL_BATCH) break;
-        offset += FETCH_ALL_BATCH;
+      // First batch: get total count
+      const first = await saqApi.search({ ...baseParams, limit: FETCH_ALL_BATCH, offset: 0 } as any);
+      const total = first.count || first.wines.length;
+      let all: Wine[] = [...first.wines];
+      let loaded = all.length;
+      setFetchProgress({ loaded, total });
+
+      if (all.length < total) {
+        // Remaining batches in parallel
+        const promises: Promise<any>[] = [];
+        for (let off = FETCH_ALL_BATCH; off < total; off += FETCH_ALL_BATCH) {
+          promises.push(
+            saqApi.search({ ...baseParams, limit: FETCH_ALL_BATCH, offset: off } as any).then((data) => {
+              loaded += data.wines.length;
+              setFetchProgress({ loaded, total });
+              return data;
+            })
+          );
+        }
+        const results = await Promise.all(promises);
+        for (const data of results) all = [...all, ...data.wines];
       }
       // Deduplicate
       const seen = new Set<string>();
@@ -200,17 +224,19 @@ export default function SearchScreen() {
     } catch {
       // Keep existing partial results
     } finally {
+      loadingAllRef.current = false;
       setLoadingAll(false);
+      setFetchProgress(null);
     }
-  }, [buildSearchParams, loadingAll]);
+  }, [buildSearchParams]);
 
   // Trigger fetchAll when sort is activated and we don't have all results yet
   useEffect(() => {
     setSortedDisplayCount(PAGE_SIZE); // reset pagination on sort change
-    if (sortBy !== 'default' && !allResults && hasSearched && totalCount > results.length && !loadingAll) {
+    if (sortBy !== 'default' && !allResults && hasSearched && totalCount > results.length && !loadingAllRef.current) {
       fetchAllResults();
     }
-  }, [sortBy, allResults, hasSearched, totalCount, results.length, loadingAll, fetchAllResults]);
+  }, [sortBy, allResults, hasSearched, totalCount, results.length, fetchAllResults]);
 
   // Fetch stats for trending section (cached 30 min)
   useEffect(() => {
@@ -218,6 +244,15 @@ export default function SearchScreen() {
     if (cached) { setStats(cached); return; }
     saqApi.stats().then((data) => { apiCache.setStats(data); setStats(data); }).catch(() => {});
   }, []);
+
+  // Fetch price alerts: favorites that are on sale
+  useEffect(() => {
+    if (favorites.length === 0) { setPriceAlerts([]); return; }
+    const favIds = new Set(favorites.map((f) => f.id));
+    saqApi.search({ onlySale: true, limit: 200 } as any).then((data) => {
+      setPriceAlerts(data.wines.filter((w: Wine) => favIds.has(w.id)));
+    }).catch(() => {});
+  }, [favorites]);
 
   // Handle incoming query param from map country click
   useEffect(() => {
@@ -268,16 +303,21 @@ export default function SearchScreen() {
     doSearch();
   };
 
-  const activeFilterCount = [filters.type, filters.country, filters.onlySale, filters.onlyOrganic, filters.onlyExpert].filter(Boolean).length;
+  const activeFilterCount = [filters.type, filters.country, filters.grape, filters.appellation, filters.onlySale, filters.onlyOrganic, filters.onlyExpert].filter(Boolean).length;
 
   // Native DOM scroll listener — backup for infinite scroll on web
   // Uses cached scroll container ref to avoid expensive querySelectorAll('*') every time
   const loadMoreRef = useRef(loadMore);
   loadMoreRef.current = loadMore;
+  const sortByRef = useRef(sortBy);
+  sortByRef.current = sortBy;
+  const allResultsRef = useRef(allResults);
+  allResultsRef.current = allResults;
   useEffect(() => {
-    if (typeof document === 'undefined' || results.length === 0 || results.length >= totalCount) return;
+    if (typeof document === 'undefined' || results.length === 0) return;
+    const inSortMode = sortBy !== 'default' && allResults;
+    if (!inSortMode && results.length >= totalCount) return;
     const timer = setTimeout(() => {
-      // Reuse cached element if still in DOM, otherwise find it once
       if (!scrollElRef.current || !document.body.contains(scrollElRef.current)) {
         scrollElRef.current = findScrollContainer();
       }
@@ -285,14 +325,18 @@ export default function SearchScreen() {
       if (!el) return;
       const handler = () => {
         if (el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 1.5) {
-          loadMoreRef.current();
+          if (sortByRef.current !== 'default' && allResultsRef.current) {
+            setSortedDisplayCount((c) => Math.min(c + PAGE_SIZE, allResultsRef.current!.length));
+          } else {
+            loadMoreRef.current();
+          }
         }
       };
       el.addEventListener('scroll', handler, { passive: true });
       (window as any).__scrollCleanup = () => el.removeEventListener('scroll', handler);
     }, 300);
     return () => { clearTimeout(timer); (window as any).__scrollCleanup?.(); };
-  }, [results.length, totalCount]);
+  }, [results.length, totalCount, sortBy, allResults]);
 
   // Memoized scroll handler — avoids re-creating on every render
   const handleScroll = useCallback((e: any) => {
@@ -419,9 +463,33 @@ export default function SearchScreen() {
 
       {!loading && !error && !hasSearched && (
         <ScrollView style={styles.trendingScroll} showsVerticalScrollIndicator={false}>
-          {/* Show search prompt if no history */}
-          {history.length === 0 && (
+          {/* Show search prompt if no history and no recent */}
+          {history.length === 0 && recentWines.length === 0 && (
             <EmptyState icon="search-outline" message={t.search.searchWine} submessage={t.search.searchWineSub} />
+          )}
+
+          {/* Price alerts — favorites on sale */}
+          {priceAlerts.length > 0 && (
+            <View style={styles.trendingSection}>
+              <Text style={[styles.trendingTitle, { color: colors.black }]}>{t.priceAlerts.title}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: SPACING.md }}>
+                {priceAlerts.map((w) => (
+                  <WineCard key={w.id} wine={w} compact />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Recently viewed wines */}
+          {recentWines.length > 0 && (
+            <View style={styles.trendingSection}>
+              <Text style={[styles.trendingTitle, { color: colors.black }]}>{t.recentlyViewed.title}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: SPACING.md }}>
+                {recentWines.slice(0, 10).map((w) => (
+                  <WineCard key={w.id} wine={w as Wine} compact />
+                ))}
+              </ScrollView>
+            </View>
           )}
 
           {/* Trending stats */}
@@ -510,7 +578,9 @@ export default function SearchScreen() {
             {loadingAll && (
               <View style={styles.loadingMore}>
                 <ActivityIndicator size="small" color={colors.burgundy} />
-                <Text style={[styles.loadingMoreText, { color: colors.gray }]}>{t.common.loading}</Text>
+                <Text style={[styles.loadingMoreText, { color: colors.gray }]}>
+                  {fetchProgress ? `${fetchProgress.loaded} / ${fetchProgress.total}...` : t.common.loading}
+                </Text>
               </View>
             )}
             {!loadingAll && sortBy !== 'default' && allResults && sortedDisplayCount < allResults.length && (
@@ -554,6 +624,7 @@ export default function SearchScreen() {
         onApply={handleApplyFilters}
         initialFilters={filters}
         countries={stats?.topCountries}
+        grapes={stats?.topGrapes}
       />
     </View>
   );

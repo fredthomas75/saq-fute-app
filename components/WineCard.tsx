@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Share, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
@@ -45,6 +45,12 @@ function WineCard({ wine, compact }: Props) {
       addFavorite(wine);
       showToast(t.toast.favoriteAdded);
     }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({ message: `🍷 ${wine.name}\n💰 ${wine.price?.toFixed(2)}$\n🔗 ${wine.saqUrl}` });
+    } catch (_) {}
   };
 
   const toggleWish = () => {
@@ -128,6 +134,9 @@ function WineCard({ wine, compact }: Props) {
           )}
         </View>
         <View style={styles.headerActions}>
+          <Pressable onPress={handleShare} hitSlop={8} accessibilityLabel={t.wineDetail.share} accessibilityRole="button">
+            <Ionicons name="share-outline" size={18} color={COLORS.gray} />
+          </Pressable>
           <Pressable onPress={toggleWish} hitSlop={8} accessibilityLabel={wished ? t.wishlist.inList : t.wishlist.add} accessibilityRole="button" accessibilityState={{ selected: wished }}>
             <Ionicons name={wished ? 'bookmark' : 'bookmark-outline'} size={20} color={wished ? COLORS.gold : COLORS.gray} />
           </Pressable>
