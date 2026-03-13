@@ -6,8 +6,8 @@ import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { saqApi } from '@/services/api';
 import SearchCache, { searchCache } from '@/services/searchCache';
-import { apiCache } from '@/services/apiCache';
-import type { Wine, StatsResponse } from '@/types/wine';
+import type { Wine } from '@/types/wine';
+import { useStats } from '@/hooks/useStats';
 import { useTranslation, useTranslateCountry } from '@/i18n';
 import { useSettings } from '@/context/SettingsContext';
 import { hapticSelection } from '@/services/haptics';
@@ -53,13 +53,13 @@ export default function SearchScreen() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [stats, setStats] = useState<StatsResponse | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryRef = useRef('');
   const pageRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const scrollElRef = useRef<HTMLElement | null>(null); // cached DOM scroll container
+  const stats = useStats();
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [vipFallback, setVipFallback] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>('default');
@@ -232,13 +232,6 @@ export default function SearchScreen() {
       fetchAllResults();
     }
   }, [sortBy, allResults, hasSearched, totalCount, results.length, fetchAllResults]);
-
-  // Fetch stats for trending section (cached 30 min)
-  useEffect(() => {
-    const cached = apiCache.getStats();
-    if (cached) { setStats(cached); return; }
-    saqApi.stats().then((data) => { apiCache.setStats(data); setStats(data); }).catch(() => {});
-  }, []);
 
   // Handle incoming query param from map country click
   useEffect(() => {

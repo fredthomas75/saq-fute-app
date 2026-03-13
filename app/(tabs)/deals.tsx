@@ -22,7 +22,7 @@ export default function DealsScreen() {
   const t = useTranslation();
   const colors = useThemeColors();
   const router = useRouter();
-  const { vipMode, language } = useSettings();
+  const { vipMode } = useSettings();
   const [budget, setBudget] = useState<number>(25);
   const [coeurs, setCoeurs] = useState<Wine[]>([]);
   const [deals, setDeals] = useState<Wine[]>([]);
@@ -48,19 +48,25 @@ export default function DealsScreen() {
     return idx > 0 ? BUDGETS[idx - 1] : 0;
   };
 
+  // Filter wines to only include those within the price bracket (floor, budget]
+  const filterToBracket = (wines: Wine[], b: number): Wine[] => {
+    const floor = getFloor(b);
+    return wines.filter(w => w.price > floor && w.price <= b);
+  };
+
   // Merge sweet-spot wines with deals: sweet-spot first, then remaining deals (deduped)
-  const mergeDeals = (sweetSpot: Wine[], rawDeals: Wine[]): Wine[] => {
-    const seen = new Set(sweetSpot.map(w => w.id));
-    const rest = rawDeals.filter(w => !seen.has(w.id));
-    return [...sweetSpot, ...rest].slice(0, 10);
+  const mergeDeals = (sweetSpot: Wine[], rawDeals: Wine[], b: number): Wine[] => {
+    const filtered = filterToBracket([...sweetSpot, ...rawDeals], b);
+    const seen = new Set<string>();
+    return filtered.filter(w => { if (seen.has(w.id)) return false; seen.add(w.id); return true; }).slice(0, 10);
   };
 
   // Fetch ONLY deals for a given budget (used on budget change)
   const fetchDealsOnly = useCallback(async (b: number) => {
-    // Check cache first
+    // Check cache first — re-filter to bracket in case of stale data
     const cached = apiCache.getDeals(b, vipMode || undefined);
     if (cached) {
-      setDeals(cached);
+      setDeals(filterToBracket(cached, b));
       return;
     }
 
@@ -68,12 +74,12 @@ export default function DealsScreen() {
     try {
       const floor = getFloor(b);
       const [dealsRes, sweetRes] = await Promise.all([
-        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined, lang: language }),
+        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined }),
         floor > 0
-          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined, lang: language })
+          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined })
           : Promise.resolve({ wines: [] as Wine[] } as any),
       ]);
-      const merged = mergeDeals(sweetRes.wines || [], dealsRes.wines);
+      const merged = mergeDeals(sweetRes.wines || [], dealsRes.wines, b);
       apiCache.setDeals(b, vipMode || undefined, merged);
       setDeals(merged);
     } catch (err) {
@@ -88,7 +94,7 @@ export default function DealsScreen() {
   const fetchCoeurs = useCallback(async () => {
     if (coeursLoaded.current) return;
     try {
-      const coeurRes = await saqApi.coeur({ limit: 30, lang: language });
+      const coeurRes = await saqApi.coeur({ limit: 30 });
       setCoeurs(shuffle(coeurRes.wines).slice(0, 10));
       coeursLoaded.current = true;
     } catch {}
@@ -108,14 +114,14 @@ export default function DealsScreen() {
 
       const [, dealsRes, sweetRes, promoRes] = await Promise.all([
         coeurPromise,
-        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined, lang: language }),
+        saqApi.deals({ budget: b, limit: 10, vip: vipMode || undefined }),
         floor > 0
-          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined, lang: language })
+          ? saqApi.search({ minPrice: floor, maxPrice: b, limit: 5, vip: vipMode || undefined })
           : Promise.resolve({ wines: [] as Wine[] } as any),
-        saqApi.search({ onlySale: true, limit: 10, vip: vipMode || undefined, lang: language }),
+        saqApi.search({ onlySale: true, limit: 10, vip: vipMode || undefined }),
       ]);
 
-      const merged = mergeDeals(sweetRes.wines || [], dealsRes.wines);
+      const merged = mergeDeals(sweetRes.wines || [], dealsRes.wines, b);
       apiCache.setDeals(b, vipMode || undefined, merged);
       setDeals(merged);
       setPromos(promoRes.wines);

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, VIP_COLORS } from '@/constants/theme';
 import { useTranslation } from '@/i18n';
 import { useSettings } from '@/context/SettingsContext';
-import { useIsDark, useThemeColors } from '@/hooks/useThemeColors';
+import { useIsDark, useThemeColors, useHeaderTheme } from '@/hooks/useThemeColors';
 import HeaderLogo from '@/components/HeaderLogo';
 import HeaderIcons from '@/components/HeaderIcons';
 
@@ -13,17 +13,12 @@ export default function TabLayout() {
   const { vipMode } = useSettings();
   const isDark = useIsDark();
   const colors = useThemeColors();
+  const { headerBg, headerTint } = useHeaderTheme();
 
   const getTabBarStyle = () => {
     if (vipMode) return { backgroundColor: VIP_COLORS.bg, borderTopColor: VIP_COLORS.border };
     if (isDark) return { backgroundColor: colors.cream, borderTopColor: colors.grayLight };
     return { backgroundColor: COLORS.cream, borderTopColor: COLORS.grayLight };
-  };
-
-  const getHeaderBg = () => {
-    if (vipMode) return VIP_COLORS.bg;
-    if (isDark) return colors.creamDark;
-    return COLORS.burgundy;
   };
 
   return (
@@ -32,8 +27,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: vipMode ? VIP_COLORS.active : (isDark ? '#D08090' : COLORS.burgundy),
         tabBarInactiveTintColor: vipMode ? VIP_COLORS.inactive : COLORS.gray,
         tabBarStyle: getTabBarStyle(),
-        headerStyle: { backgroundColor: getHeaderBg() },
-        headerTintColor: vipMode ? COLORS.gold : (isDark ? '#F5F5F5' : COLORS.white),
+        headerStyle: { backgroundColor: headerBg },
+        headerTintColor: headerTint,
         headerTitleStyle: { fontWeight: '700' },
         headerTitle: '',
         headerLeft: () => <HeaderLogo />,
@@ -85,4 +80,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-

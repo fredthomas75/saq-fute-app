@@ -1,14 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useStats } from '@/hooks/useStats';
 import { saqApi } from '@/services/api';
-import { apiCache } from '@/services/apiCache';
-import type { Wine, StatsResponse } from '@/types/wine';
+import type { Wine } from '@/types/wine';
 import { useTranslation, useTranslateCountry } from '@/i18n';
-import { useSettings } from '@/context/SettingsContext';
 import { useRecentlyViewed } from '@/context/RecentlyViewedContext';
 import { useFavorites } from '@/context/FavoritesContext';
 import WineCard from '@/components/WineCard';
@@ -18,35 +17,33 @@ export default function HomeScreen() {
   const tc = useTranslateCountry();
   const colors = useThemeColors();
   const router = useRouter();
-  const { language } = useSettings();
   const { recentWines } = useRecentlyViewed();
   const { favorites } = useFavorites();
 
-  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const stats = useStats();
   const [priceAlerts, setPriceAlerts] = useState<Wine[]>([]);
 
-  // Fetch stats (cached 30 min)
-  useEffect(() => {
-    const cached = apiCache.getStats();
-    if (cached) { setStats(cached); return; }
-    saqApi.stats().then((data) => { apiCache.setStats(data); setStats(data); }).catch(() => {});
-  }, []);
+  // Stable dependency for favorites IDs
+  const favIdStr = useMemo(() => favorites.map((f) => f.id).sort().join(','), [favorites]);
 
-  // Fetch price alerts: favorites on sale
+  // Fetch price alerts: favorites on sale (with race-condition guard)
   useEffect(() => {
-    if (favorites.length === 0) { setPriceAlerts([]); return; }
-    const favIds = new Set(favorites.map((f) => f.id));
+    if (!favIdStr) { setPriceAlerts([]); return; }
+    let cancelled = false;
+    const favIds = new Set(favIdStr.split(','));
     saqApi.search({ onlySale: true, limit: 200 } as any).then((data) => {
-      setPriceAlerts(data.wines.filter((w: Wine) => favIds.has(w.id)));
+      if (!cancelled) setPriceAlerts(data.wines.filter((w: Wine) => favIds.has(w.id)));
     }).catch(() => {});
-  }, [favorites]);
+    return () => { cancelled = true; };
+  }, [favIdStr]);
 
-  const quickActions = [
+  // Memoized quick actions to prevent child re-renders
+  const quickActions = useMemo(() => [
     { icon: 'search' as const, label: t.home.quickSearch, color: COLORS.burgundy, onPress: () => router.push('/search') },
-    { icon: 'scan-outline' as const, label: t.home.quickScan, color: '#E67E22', onPress: () => router.push('/camera') },
+    { icon: 'scan-outline' as const, label: t.home.quickScan, color: COLORS.orange, onPress: () => router.push('/camera') },
     { icon: 'chatbubbles' as const, label: t.home.quickSommelier, color: '#8E44AD', onPress: () => router.push('/chat') },
-    { icon: 'restaurant' as const, label: t.home.quickPairing, color: '#27AE60', onPress: () => router.push('/pairing') },
-  ];
+    { icon: 'restaurant' as const, label: t.home.quickPairing, color: COLORS.green, onPress: () => router.push('/pairing') },
+  ], [t, router]);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.cream }]} showsVerticalScrollIndicator={false}>
@@ -71,26 +68,12 @@ export default function HomeScreen() {
 
       {/* Price alerts — favorites on sale */}
       {priceAlerts.length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.black }]}>{t.priceAlerts.title}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: SPACING.md }}>
-            {priceAlerts.map((w) => (
-              <WineCard key={w.id} wine={w} compact />
-            ))}
-          </ScrollView>
-        </View>
+        <HorizontalWineList title={t.priceAlerts.title} wines={priceAlerts} colors={colors} />
       )}
 
       {/* Recently viewed wines */}
       {recentWines.length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.black }]}>{t.recentlyViewed.title}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: SPACING.md }}>
-            {recentWines.slice(0, 10).map((w) => (
-              <WineCard key={w.id} wine={w as Wine} compact />
-            ))}
-          </ScrollView>
-        </View>
+        <HorizontalWineList title={t.recentlyViewed.title} wines={recentWines.slice(0, 10) as Wine[]} colors={colors} />
       )}
 
       {/* Trending stats */}
@@ -100,7 +83,6 @@ export default function HomeScreen() {
             <Ionicons name="trending-up" size={16} color={colors.burgundy} /> {t.search.trending}
           </Text>
 
-          {/* Quick stats row */}
           <View style={styles.statsRow}>
             <View style={[styles.statCard, { backgroundColor: colors.white }]}>
               <Text style={[styles.statNumber, { color: colors.burgundy }]}>{stats.total.toLocaleString()}</Text>
@@ -117,34 +99,20 @@ export default function HomeScreen() {
           </View>
 
           {/* Top countries */}
-          <Text style={[styles.trendingSubtitle, { color: colors.black }]}>{t.search.topCountries}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingChips}>
-            {stats.topCountries.slice(0, 8).map((c) => (
-              <Pressable
-                key={c.country}
-                onPress={() => router.push({ pathname: '/search', params: { query: c.country } })}
-                style={[styles.trendingChip, { backgroundColor: colors.white, borderColor: colors.grayLight }]}
-              >
-                <Text style={[styles.trendingChipText, { color: colors.black }]}>{tc(c.country)}</Text>
-                <Text style={[styles.trendingChipCount, { color: colors.gray }]}>{c.count}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <TrendingChips
+            title={t.search.topCountries}
+            items={stats.topCountries.slice(0, 8).map((c) => ({ key: c.country, label: tc(c.country), count: c.count, query: c.country }))}
+            colors={colors}
+            onPress={(query) => router.push({ pathname: '/search', params: { query } })}
+          />
 
           {/* Top grapes */}
-          <Text style={[styles.trendingSubtitle, { color: colors.black }]}>{t.search.topGrapes}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingChips}>
-            {stats.topGrapes.slice(0, 8).map((g) => (
-              <Pressable
-                key={g.grape}
-                onPress={() => router.push({ pathname: '/search', params: { query: g.grape } })}
-                style={[styles.trendingChip, { backgroundColor: colors.white, borderColor: colors.grayLight }]}
-              >
-                <Text style={[styles.trendingChipText, { color: colors.black }]}>{'\u{1F347}'} {g.grape}</Text>
-                <Text style={[styles.trendingChipCount, { color: colors.gray }]}>{g.count}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <TrendingChips
+            title={t.search.topGrapes}
+            items={stats.topGrapes.slice(0, 8).map((g) => ({ key: g.grape, label: `\u{1F347} ${g.grape}`, count: g.count, query: g.grape }))}
+            colors={colors}
+            onPress={(query) => router.push({ pathname: '/search', params: { query } })}
+          />
         </View>
       )}
 
@@ -153,103 +121,72 @@ export default function HomeScreen() {
   );
 }
 
+/* ---- Extracted sub-components ---- */
+
+function HorizontalWineList({ title, wines, colors }: { title: string; wines: Wine[]; colors: any }) {
+  return (
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.black }]}>{title}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: SPACING.md }}>
+        {wines.map((w) => <WineCard key={w.id} wine={w} compact />)}
+      </ScrollView>
+    </View>
+  );
+}
+
+function TrendingChips({ title, items, colors, onPress }: {
+  title: string;
+  items: { key: string; label: string; count: number; query: string }[];
+  colors: any;
+  onPress: (query: string) => void;
+}) {
+  return (
+    <>
+      <Text style={[styles.trendingSubtitle, { color: colors.black }]}>{title}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingChips}>
+        {items.map((item) => (
+          <Pressable
+            key={item.key}
+            onPress={() => onPress(item.query)}
+            style={[styles.trendingChip, { backgroundColor: colors.white, borderColor: colors.grayLight }]}
+          >
+            <Text style={[styles.trendingChipText, { color: colors.black }]}>{item.label}</Text>
+            <Text style={[styles.trendingChipCount, { color: colors.gray }]}>{item.count}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </>
+  );
+}
+
+/* ---- Styles ---- */
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.cream,
-  },
+  container: { flex: 1, backgroundColor: COLORS.cream },
   heroTagline: {
-    fontSize: 15,
-    fontWeight: '500',
-    textAlign: 'center',
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
+    fontSize: 15, fontWeight: '500', textAlign: 'center',
+    paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg,
   },
-  quickActions: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.md,
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
-  },
+  quickActions: { flexDirection: 'row', paddingHorizontal: SPACING.md, gap: SPACING.sm, marginBottom: SPACING.lg },
   quickCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xs,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.white,
-    ...SHADOWS.card,
+    flex: 1, alignItems: 'center', paddingVertical: SPACING.md, paddingHorizontal: SPACING.xs,
+    borderRadius: RADIUS.md, backgroundColor: COLORS.white, ...SHADOWS.card,
   },
-  quickIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xs,
-  },
-  quickLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  section: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.lg,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: SPACING.md,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  statCard: {
-    flex: 1,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    ...SHADOWS.card,
-  },
-  statNumber: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  trendingSubtitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  trendingChips: {
-    gap: SPACING.sm,
-    paddingRight: SPACING.md,
-  },
+  quickIconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xs },
+  quickLabel: { fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  section: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.lg },
+  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: SPACING.md },
+  statsRow: { flexDirection: 'row', gap: SPACING.sm },
+  statCard: { flex: 1, padding: SPACING.md, borderRadius: RADIUS.md, alignItems: 'center', ...SHADOWS.card },
+  statNumber: { fontSize: 22, fontWeight: '800' },
+  statLabel: { fontSize: 11, fontWeight: '600', marginTop: 2, textAlign: 'center' },
+  trendingSubtitle: { fontSize: 14, fontWeight: '600', marginTop: SPACING.md, marginBottom: SPACING.sm },
+  trendingChips: { gap: SPACING.sm, paddingRight: SPACING.md },
   trendingChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-    borderColor: COLORS.grayLight,
-    ...SHADOWS.card,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full, borderWidth: 1, borderColor: COLORS.grayLight, ...SHADOWS.card,
   },
-  trendingChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  trendingChipCount: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
+  trendingChipText: { fontSize: 13, fontWeight: '600' },
+  trendingChipCount: { fontSize: 11, fontWeight: '500' },
 });
