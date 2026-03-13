@@ -12,8 +12,6 @@ import { useTranslation, useTranslateCountry } from '@/i18n';
 import { useSettings } from '@/context/SettingsContext';
 import { hapticSelection } from '@/services/haptics';
 import { useSearchHistory } from '@/context/SearchHistoryContext';
-import { useRecentlyViewed } from '@/context/RecentlyViewedContext';
-import { useFavorites } from '@/context/FavoritesContext';
 import SearchBar from '@/components/SearchBar';
 import VipBanner from '@/components/VipBanner';
 import WineCard from '@/components/WineCard';
@@ -43,8 +41,6 @@ export default function SearchScreen() {
   const router = useRouter();
   const { vipMode, language } = useSettings();
   const { history, addEntry, removeEntry, clearHistory } = useSearchHistory();
-  const { recentWines } = useRecentlyViewed();
-  const { favorites } = useFavorites();
   const params = useLocalSearchParams<{ query?: string }>();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>({ onlySale: false, onlyOrganic: false, onlyExpert: false });
@@ -72,7 +68,6 @@ export default function SearchScreen() {
   const loadingAllRef = useRef(false); // sync guard for fetchAll
   const [sortedDisplayCount, setSortedDisplayCount] = useState(PAGE_SIZE); // paginate sorted view
   const [fetchProgress, setFetchProgress] = useState<{ loaded: number; total: number } | null>(null);
-  const [priceAlerts, setPriceAlerts] = useState<Wine[]>([]);
 
   // Cleanup search timer on unmount
   useEffect(() => {
@@ -244,15 +239,6 @@ export default function SearchScreen() {
     if (cached) { setStats(cached); return; }
     saqApi.stats().then((data) => { apiCache.setStats(data); setStats(data); }).catch(() => {});
   }, []);
-
-  // Fetch price alerts: favorites that are on sale
-  useEffect(() => {
-    if (favorites.length === 0) { setPriceAlerts([]); return; }
-    const favIds = new Set(favorites.map((f) => f.id));
-    saqApi.search({ onlySale: true, limit: 200 } as any).then((data) => {
-      setPriceAlerts(data.wines.filter((w: Wine) => favIds.has(w.id)));
-    }).catch(() => {});
-  }, [favorites]);
 
   // Handle incoming query param from map country click
   useEffect(() => {
@@ -461,92 +447,8 @@ export default function SearchScreen() {
         <EmptyState message={t.search.noResults} submessage={t.search.noResultsSub} />
       )}
 
-      {!loading && !error && !hasSearched && (
-        <ScrollView style={styles.trendingScroll} showsVerticalScrollIndicator={false}>
-          {/* Show search prompt if no history and no recent */}
-          {history.length === 0 && recentWines.length === 0 && (
-            <EmptyState icon="search-outline" message={t.search.searchWine} submessage={t.search.searchWineSub} />
-          )}
-
-          {/* Price alerts — favorites on sale */}
-          {priceAlerts.length > 0 && (
-            <View style={styles.trendingSection}>
-              <Text style={[styles.trendingTitle, { color: colors.black }]}>{t.priceAlerts.title}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: SPACING.md }}>
-                {priceAlerts.map((w) => (
-                  <WineCard key={w.id} wine={w} compact />
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Recently viewed wines */}
-          {recentWines.length > 0 && (
-            <View style={styles.trendingSection}>
-              <Text style={[styles.trendingTitle, { color: colors.black }]}>{t.recentlyViewed.title}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: SPACING.md }}>
-                {recentWines.slice(0, 10).map((w) => (
-                  <WineCard key={w.id} wine={w as Wine} compact />
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Trending stats */}
-          {stats && (
-            <View style={styles.trendingSection}>
-              <Text style={[styles.trendingTitle, { color: colors.black }]}>
-                <Ionicons name="trending-up" size={16} color={colors.burgundy} /> {t.search.trending}
-              </Text>
-
-              {/* Quick stats row */}
-              <View style={styles.statsRow}>
-                <View style={[styles.statCard, { backgroundColor: colors.white }]}>
-                  <Text style={[styles.statNumber, { color: colors.burgundy }]}>{stats.total.toLocaleString()}</Text>
-                  <Text style={[styles.statLabel, { color: colors.gray }]}>{t.search.totalWines}</Text>
-                </View>
-                <View style={[styles.statCard, { backgroundColor: colors.white }]}>
-                  <Text style={[styles.statNumber, { color: COLORS.red }]}>{stats.onSale.toLocaleString()}</Text>
-                  <Text style={[styles.statLabel, { color: colors.gray }]}>{t.search.onSaleCount}</Text>
-                </View>
-                <View style={[styles.statCard, { backgroundColor: colors.white }]}>
-                  <Text style={[styles.statNumber, { color: COLORS.green }]}>{stats.organic.toLocaleString()}</Text>
-                  <Text style={[styles.statLabel, { color: colors.gray }]}>{t.search.organicCount}</Text>
-                </View>
-              </View>
-
-              {/* Top countries */}
-              <Text style={[styles.trendingSubtitle, { color: colors.black }]}>{t.search.topCountries}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingChips}>
-                {stats.topCountries.slice(0, 8).map((c) => (
-                  <Pressable
-                    key={c.country}
-                    onPress={() => { handleQueryChange(c.country); }}
-                    style={[styles.trendingChip, { backgroundColor: colors.white, borderColor: colors.grayLight }]}
-                  >
-                    <Text style={[styles.trendingChipText, { color: colors.black }]}>{tc(c.country)}</Text>
-                    <Text style={[styles.trendingChipCount, { color: colors.gray }]}>{c.count}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              {/* Top grapes */}
-              <Text style={[styles.trendingSubtitle, { color: colors.black }]}>{t.search.topGrapes}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingChips}>
-                {stats.topGrapes.slice(0, 8).map((g) => (
-                  <Pressable
-                    key={g.grape}
-                    onPress={() => { handleQueryChange(g.grape); }}
-                    style={[styles.trendingChip, { backgroundColor: colors.white, borderColor: colors.grayLight }]}
-                  >
-                    <Text style={[styles.trendingChipText, { color: colors.black }]}>🍇 {g.grape}</Text>
-                    <Text style={[styles.trendingChipCount, { color: colors.gray }]}>{g.count}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </ScrollView>
+      {!loading && !error && !hasSearched && history.length === 0 && (
+        <EmptyState icon="search-outline" message={t.search.searchWine} submessage={t.search.searchWineSub} />
       )}
 
       {!loading && results.length > 0 && (
@@ -747,68 +649,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.grayDark,
     maxWidth: 120,
-  },
-  trendingScroll: {
-    flex: 1,
-  },
-  trendingSection: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
-  },
-  trendingTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: SPACING.md,
-  },
-  trendingSubtitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  statCard: {
-    flex: 1,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    ...SHADOWS.card,
-  },
-  statNumber: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  trendingChips: {
-    gap: SPACING.sm,
-    paddingRight: SPACING.md,
-  },
-  trendingChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-    borderColor: COLORS.grayLight,
-    ...SHADOWS.card,
-  },
-  trendingChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  trendingChipCount: {
-    fontSize: 11,
-    fontWeight: '500',
   },
   loadingMore: {
     flexDirection: 'row',

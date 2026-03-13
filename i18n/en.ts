@@ -2,11 +2,20 @@ import type { fr } from './fr';
 
 export const en: typeof fr = {
   tabs: {
+    home: 'Home',
     search: 'Search',
     deals: 'Deals',
     pairing: 'Pairing',
     chat: 'AI Sommelier',
     favorites: 'Favorites',
+  },
+
+  home: {
+    tagline: 'Your smart sommelier',
+    quickSearch: 'Search',
+    quickScan: 'Scan',
+    quickSommelier: 'AI Sommelier',
+    quickPairing: 'Pairings',
   },
 
   search: {

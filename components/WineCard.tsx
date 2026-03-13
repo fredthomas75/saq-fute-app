@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, Share, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { TYPE_COLORS, COUNTRY_FLAGS } from '@/constants/wine';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -21,6 +21,7 @@ interface Props {
 
 function WineCard({ wine, compact }: Props) {
   const router = useRouter();
+  const segments = useSegments();
   const t = useTranslation();
   const tc = useTranslateCountry();
   const colors = useThemeColors();
@@ -33,7 +34,13 @@ function WineCard({ wine, compact }: Props) {
   const userNote = getNote(wine.id);
 
   const handlePress = () => {
-    router.push({ pathname: '/wine/[id]', params: { id: wine.id, name: wine.name } });
+    // Navigate within (home) group to keep tab bar visible, fallback to root
+    const inHomeTab = segments.includes('(home)' as never);
+    if (inHomeTab) {
+      router.push({ pathname: '/(home)/wine/[id]' as any, params: { id: wine.id, name: wine.name } });
+    } else {
+      router.push({ pathname: '/wine/[id]', params: { id: wine.id, name: wine.name } });
+    }
   };
 
   const toggleFav = () => {

@@ -1,10 +1,19 @@
 export const fr = {
   tabs: {
+    home: 'Accueil',
     search: 'Recherche',
     deals: 'Deals',
     pairing: 'Accords',
     chat: 'Sommelier IA',
     favorites: 'Favoris',
+  },
+
+  home: {
+    tagline: 'Ton sommelier intelligent',
+    quickSearch: 'Rechercher',
+    quickScan: 'Scanner',
+    quickSommelier: 'Sommelier IA',
+    quickPairing: 'Accords',
   },
 
   search: {

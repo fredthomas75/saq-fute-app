@@ -41,7 +41,14 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="(home)"
+        options={{
+          tabBarLabel: t.tabs.home,
+          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="search"
         options={{
           tabBarLabel: t.tabs.search,
           tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
@@ -52,13 +59,6 @@ export default function TabLayout() {
         options={{
           tabBarLabel: t.tabs.deals,
           tabBarIcon: ({ color, size }) => <Ionicons name="flame" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="pairing"
-        options={{
-          tabBarLabel: t.tabs.pairing,
-          tabBarIcon: ({ color, size }) => <Ionicons name="restaurant" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -76,6 +76,7 @@ export default function TabLayout() {
         }}
       />
       {/* Hidden tabs — keep tab bar visible on these screens */}
+      <Tabs.Screen name="pairing" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.tabs.pairing} /> }} />
       <Tabs.Screen name="cellar" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.cellar.title} /> }} />
       <Tabs.Screen name="wishlist" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.wishlist.title} /> }} />
       <Tabs.Screen name="map" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.map.title} /> }} />
