@@ -53,10 +53,16 @@ const SAQ_HOST = /https?:\/\/(?:www\.)?saq\.com/;
 const SECTION_EMOJI = /\s*([\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}])/gu;
 
 function formatWineText(text: string): string {
+  // Remove markdown-style horizontal rules (---, ===, ___)
+  let formatted = text.replace(/\s*[-=_]{3,}\s*/g, '\n');
   // Add line breaks before section emojis (📍💰🍇📝🍽️⭐❤️ etc.)
-  let formatted = text.replace(SECTION_EMOJI, '\n$1');
-  // Clean up leading newline if any
-  formatted = formatted.replace(/^\n+/, '');
+  formatted = formatted.replace(SECTION_EMOJI, '\n$1');
+  // Remove lines that contain ONLY emoji(s) and whitespace (no real text)
+  formatted = formatted.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\uFE0F\s]+$/gmu, '');
+  // Collapse multiple consecutive blank lines into one
+  formatted = formatted.replace(/\n{2,}/g, '\n');
+  // Clean up leading/trailing whitespace
+  formatted = formatted.trim();
   return formatted;
 }
 
