@@ -50,13 +50,8 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.cream }]} showsVerticalScrollIndicator={false}>
-      {/* Hero */}
-      <View style={[styles.hero, { backgroundColor: colors.burgundy }]}>
-        <Text style={styles.heroTitle}>SAQ Futé</Text>
-        <Text style={styles.heroTagline}>{t.home.tagline}</Text>
-      </View>
-
       {/* Quick Actions */}
+      <Text style={[styles.heroTagline, { color: colors.gray }]}>{t.home.tagline}</Text>
       <View style={styles.quickActions}>
         {quickActions.map((action) => (
           <Pressable
@@ -163,28 +158,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.cream,
   },
-  hero: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.lg,
-    backgroundColor: COLORS.burgundy,
-  },
-  heroTitle: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: COLORS.white,
-    marginBottom: SPACING.xs,
-  },
   heroTagline: {
-    fontSize: 16,
-    color: COLORS.white + 'CC',
+    fontSize: 15,
     fontWeight: '500',
+    textAlign: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
   },
   quickActions: {
     flexDirection: 'row',
     paddingHorizontal: SPACING.md,
     gap: SPACING.sm,
-    marginTop: -SPACING.md,
     marginBottom: SPACING.lg,
   },
   quickCard: {
