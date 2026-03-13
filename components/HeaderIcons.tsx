@@ -29,6 +29,9 @@ export default function HeaderIcons() {
           <Ionicons name="diamond-outline" size={iconSize} color={iconColor} style={{ opacity: 0.6 }} />
         )}
       </Pressable>
+      <Pressable onPress={() => router.push('/pairing')} style={[styles.btn, compact && styles.btnCompact]} hitSlop={12}>
+        <Ionicons name="restaurant-outline" size={iconSize} color={iconColor} />
+      </Pressable>
       <Pressable onPress={() => router.push('/cellar')} style={[styles.btn, compact && styles.btnCompact]} hitSlop={12}>
         <MaterialCommunityIcons name="bottle-wine-outline" size={iconSize + 1} color={iconColor} />
       </Pressable>
