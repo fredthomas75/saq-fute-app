@@ -10,10 +10,20 @@ export const fr = {
 
   home: {
     tagline: '',
+    greeting: 'Bonjour',
+    greetingEvening: 'Bonsoir',
+    subtitle: 'Que cherchez-vous aujourd\'hui?',
     quickSearch: 'Rechercher',
+    quickSearchSub: 'Vins, cépages, pays',
     quickScan: 'Scanner',
+    quickScanSub: 'Photo d\'étiquette',
     quickSommelier: 'Sommelier IA',
+    quickSommelierSub: 'Conseils personnalisés',
     quickPairing: 'Accords',
+    quickPairingSub: 'Mets & vins',
+    statsTitle: 'En ce moment à la SAQ',
+    winesAvailable: 'vins',
+    explore: 'Explorer',
   },
 
   search: {

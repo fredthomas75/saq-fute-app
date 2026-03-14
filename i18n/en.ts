@@ -12,10 +12,20 @@ export const en: typeof fr = {
 
   home: {
     tagline: '',
+    greeting: 'Hello',
+    greetingEvening: 'Good evening',
+    subtitle: 'What are you looking for today?',
     quickSearch: 'Search',
+    quickSearchSub: 'Wines, grapes, countries',
     quickScan: 'Scan',
+    quickScanSub: 'Label photo',
     quickSommelier: 'AI Sommelier',
+    quickSommelierSub: 'Personal advice',
     quickPairing: 'Pairings',
+    quickPairingSub: 'Food & wine',
+    statsTitle: 'Right now at SAQ',
+    winesAvailable: 'wines',
+    explore: 'Explore',
   },
 
   search: {
