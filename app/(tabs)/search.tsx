@@ -41,7 +41,7 @@ export default function SearchScreen() {
   const router = useRouter();
   const { vipMode, language } = useSettings();
   const { history, addEntry, removeEntry, clearHistory } = useSearchHistory();
-  const params = useLocalSearchParams<{ query?: string }>();
+  const params = useLocalSearchParams<{ query?: string; onlySale?: string; onlyOrganic?: string }>();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>({ onlySale: false, onlyOrganic: false, onlyExpert: false });
   const [results, setResults] = useState<Wine[]>([]);
@@ -233,14 +233,24 @@ export default function SearchScreen() {
     }
   }, [sortBy, allResults, hasSearched, totalCount, results.length, fetchAllResults]);
 
-  // Handle incoming query param from map country click
+  // Handle incoming query/filter params from home screen tiles or map
   useEffect(() => {
+    let changed = false;
     if (params.query) {
       setQuery(params.query);
       queryRef.current = params.query;
-      doSearch();
+      changed = true;
     }
-  }, [params.query, doSearch]);
+    if (params.onlySale === 'true') {
+      setFilters((f) => ({ ...f, onlySale: true }));
+      changed = true;
+    }
+    if (params.onlyOrganic === 'true') {
+      setFilters((f) => ({ ...f, onlyOrganic: true }));
+      changed = true;
+    }
+    if (changed) doSearch();
+  }, [params.query, params.onlySale, params.onlyOrganic, doSearch]);
 
   const handleQueryChange = useCallback((text: string) => {
     setQuery(text);
