@@ -48,7 +48,6 @@ export default function HomeScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.cream }]} showsVerticalScrollIndicator={false}>
       {/* Quick Actions */}
-      <Text style={[styles.heroTagline, { color: colors.gray }]}>{t.home.tagline}</Text>
       <View style={styles.quickActions}>
         {quickActions.map((action) => (
           <Pressable
@@ -163,10 +162,6 @@ function TrendingChips({ title, items, colors, onPress }: {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.cream },
-  heroTagline: {
-    fontSize: 15, fontWeight: '500', textAlign: 'center',
-    paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg,
-  },
   quickActions: { flexDirection: 'row', paddingHorizontal: SPACING.md, gap: SPACING.sm, marginBottom: SPACING.lg },
   quickCard: {
     flex: 1, alignItems: 'center', paddingVertical: SPACING.md, paddingHorizontal: SPACING.xs,

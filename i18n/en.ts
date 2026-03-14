@@ -11,7 +11,7 @@ export const en: typeof fr = {
   },
 
   home: {
-    tagline: 'Your smart sommelier',
+    tagline: '',
     quickSearch: 'Search',
     quickScan: 'Scan',
     quickSommelier: 'AI Sommelier',

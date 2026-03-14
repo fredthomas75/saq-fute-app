@@ -9,7 +9,7 @@ export const fr = {
   },
 
   home: {
-    tagline: 'Ton sommelier intelligent',
+    tagline: '',
     quickSearch: 'Rechercher',
     quickScan: 'Scanner',
     quickSommelier: 'Sommelier IA',
