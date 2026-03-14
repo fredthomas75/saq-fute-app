@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform, Linking, Animated, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { sendChatMessage, type ChatMessage } from '@/services/chat';
 import { useTranslation } from '@/i18n';
@@ -258,12 +259,14 @@ export default function ChatScreen() {
   const t = useTranslation();
   const { language, vipMode } = useSettings();
   const colors = useThemeColors();
+  const params = useLocalSearchParams<{ prompt?: string }>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingImage, setPendingImage] = useState<{ uri: string; base64: string } | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptHandled = useRef(false);
 
   // Pick 4 random suggestions from the pool on each mount
   const randomSuggestions = useMemo(() => {
@@ -288,6 +291,9 @@ export default function ChatScreen() {
   useEffect(() => {
     return () => { if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current); };
   }, []);
+
+  // Ref for auto-sending prompt from scan
+  const sendRef = useRef<(text?: string) => Promise<void>>();
 
   const pickImage = async () => {
     if (loading) return;
@@ -359,6 +365,19 @@ export default function ChatScreen() {
       setLoading(false);
     }
   };
+
+  // Keep sendRef up to date & auto-send prompt from scan
+  sendRef.current = send;
+  useEffect(() => {
+    if (params.prompt && !promptHandled.current) {
+      promptHandled.current = true;
+      const wineName = params.prompt;
+      const question = language === 'en'
+        ? `Tell me about the wine "${wineName}". It's not available at SAQ — what can you tell me about it? Tasting notes, food pairings, similar wines available at SAQ?`
+        : `Parle-moi du vin « ${wineName} ». Il n'est pas disponible à la SAQ — que peux-tu me dire dessus ? Notes de dégustation, accords mets-vins, vins similaires disponibles à la SAQ ?`;
+      setTimeout(() => sendRef.current?.(question), 300);
+    }
+  }, [params.prompt, language]);
 
   const renderMessage = useCallback(({ item }: { item: ChatMessage }) => {
     const isUser = item.role === 'user';

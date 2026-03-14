@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, Linking, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Platform, KeyboardAvoidingView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -120,7 +120,6 @@ function WebCameraContent({ router, t }: { router: any; t: any }) {
       if (browseResult.wines?.length > 0) {
         const wine = browseResult.wines[0];
         if (wine.id) { router.replace({ pathname: '/wine/[id]', params: { id: wine.id } }); return true; }
-        if (wine.saqUrl) { Linking.openURL(wine.saqUrl); return true; }
       }
     } catch {}
     return false;
@@ -166,8 +165,7 @@ function WebCameraContent({ router, t }: { router: any; t: any }) {
       if (!found) {
         setAnalyzing(false);
         setScanStatus('');
-        const query = encodeURIComponent(cleaned);
-        Linking.openURL(`https://www.saq.com/fr/catalogsearch/result/?q=${query}`);
+        setNotFoundQuery(cleaned);
         return;
       }
     } catch (err: any) {
@@ -179,10 +177,10 @@ function WebCameraContent({ router, t }: { router: any; t: any }) {
     setScanStatus('');
   }, [analyzing, searchWineByName, t]);
 
-  const handleOpenSAQ = useCallback(() => {
-    const query = encodeURIComponent(detectedLabel || notFoundQuery || '');
-    Linking.openURL(query ? `https://www.saq.com/fr/catalogsearch/result/?q=${query}` : 'https://www.saq.com');
-  }, [notFoundQuery, detectedLabel]);
+  const handleOpenSommelier = useCallback(() => {
+    const wineName = detectedLabel || notFoundQuery || '';
+    router.push({ pathname: '/chat', params: { prompt: wineName } } as any);
+  }, [notFoundQuery, detectedLabel, router]);
 
   const handleRetry = useCallback(() => { setNotFoundQuery(null); setDetectedLabel(null); setScanStatus(''); }, []);
 
@@ -200,13 +198,13 @@ function WebCameraContent({ router, t }: { router: any; t: any }) {
       {/* Not found overlay */}
       {notFoundQuery !== null ? (
         <View style={{ alignItems: 'center', gap: SPACING.md, paddingHorizontal: SPACING.xl }}>
-          <Ionicons name="search-outline" size={40} color={COLORS.white} />
-          <Text style={styles.notFoundTitle}>{t.camera.notFound}</Text>
+          <Ionicons name="wine-outline" size={40} color={COLORS.white} />
+          <Text style={styles.notFoundTitle}>{t.camera.notFoundSAQ}</Text>
           {detectedLabel ? <Text style={styles.detectedLabelText}>{'\u00ab'} {detectedLabel} {'\u00bb'}</Text> : null}
-          <Text style={styles.notFoundSub}>{t.camera.notFoundSub}</Text>
-          <Pressable onPress={handleOpenSAQ} style={styles.saqBtn}>
-            <Ionicons name="open-outline" size={18} color={COLORS.white} />
-            <Text style={styles.saqBtnText}>{t.camera.searchSAQ}</Text>
+          <Text style={styles.notFoundSub}>{t.camera.notFoundSAQSub}</Text>
+          <Pressable onPress={handleOpenSommelier} style={styles.saqBtn}>
+            <Ionicons name="chatbubbles-outline" size={18} color={COLORS.white} />
+            <Text style={styles.saqBtnText}>{t.camera.askSommelier}</Text>
           </Pressable>
           <Pressable onPress={handleRetry} style={styles.retryBtn}>
             <Text style={styles.retryBtnText}>{t.camera.retry}</Text>
@@ -285,10 +283,6 @@ function CameraContent({ router, t }: { router: any; t: any }) {
         const wine = browseResult.wines[0];
         if (wine.id) {
           router.replace({ pathname: '/wine/[id]', params: { id: wine.id } });
-          return true;
-        }
-        if (wine.saqUrl) {
-          Linking.openURL(wine.saqUrl);
           return true;
         }
       }
@@ -370,8 +364,7 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       if (!found) {
         setAnalyzing(false);
         setScanStatus('');
-        const query = encodeURIComponent(cleaned);
-        Linking.openURL(`https://www.saq.com/fr/catalogsearch/result/?q=${query}`);
+        setNotFoundQuery(cleaned);
         return;
       }
     } catch (err: any) {
@@ -383,13 +376,10 @@ function CameraContent({ router, t }: { router: any; t: any }) {
     setScanStatus('');
   }, [analyzing, searchWineByName, t]);
 
-  const handleOpenSAQ = useCallback(() => {
-    const query = encodeURIComponent(detectedLabel || notFoundQuery || '');
-    const url = query
-      ? `https://www.saq.com/fr/catalogsearch/result/?q=${query}`
-      : 'https://www.saq.com';
-    Linking.openURL(url);
-  }, [notFoundQuery, detectedLabel]);
+  const handleOpenSommelier = useCallback(() => {
+    const wineName = detectedLabel || notFoundQuery || '';
+    router.push({ pathname: '/chat', params: { prompt: wineName } } as any);
+  }, [notFoundQuery, detectedLabel, router]);
 
   const handleRetry = useCallback(() => {
     setNotFoundQuery(null);
@@ -462,15 +452,15 @@ function CameraContent({ router, t }: { router: any; t: any }) {
       {/* Not found overlay */}
       {notFoundQuery !== null && (
         <View style={styles.notFoundOverlay}>
-          <Ionicons name="search-outline" size={40} color={COLORS.white} />
-          <Text style={styles.notFoundTitle}>{t.camera.notFound}</Text>
+          <Ionicons name="wine-outline" size={40} color={COLORS.white} />
+          <Text style={styles.notFoundTitle}>{t.camera.notFoundSAQ}</Text>
           {detectedLabel ? (
             <Text style={styles.detectedLabelText}>{'\u00ab'} {detectedLabel} {'\u00bb'}</Text>
           ) : null}
-          <Text style={styles.notFoundSub}>{t.camera.notFoundSub}</Text>
-          <Pressable onPress={handleOpenSAQ} style={styles.saqBtn}>
-            <Ionicons name="open-outline" size={18} color={COLORS.white} />
-            <Text style={styles.saqBtnText}>{t.camera.searchSAQ}</Text>
+          <Text style={styles.notFoundSub}>{t.camera.notFoundSAQSub}</Text>
+          <Pressable onPress={handleOpenSommelier} style={styles.saqBtn}>
+            <Ionicons name="chatbubbles-outline" size={18} color={COLORS.white} />
+            <Text style={styles.saqBtnText}>{t.camera.askSommelier}</Text>
           </Pressable>
           <Pressable onPress={handleRetry} style={styles.retryBtn}>
             <Text style={styles.retryBtnText}>{t.camera.retry}</Text>
