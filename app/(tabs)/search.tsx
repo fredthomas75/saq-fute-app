@@ -235,6 +235,8 @@ export default function SearchScreen() {
 
   // Handle incoming query/filter params from home screen tiles or map
   // Always reset filters to avoid accumulation across navigations
+  const doSearchRef = useRef(doSearch);
+  doSearchRef.current = doSearch;
   useEffect(() => {
     if (!params.query && !params.onlySale && !params.onlyOrganic) return;
     const freshFilters: FilterState = {
@@ -250,8 +252,10 @@ export default function SearchScreen() {
       setQuery('');
       queryRef.current = '';
     }
-    doSearch();
-  }, [params.query, params.onlySale, params.onlyOrganic, doSearch]);
+    // Defer search to next tick so filters state has propagated
+    setTimeout(() => doSearchRef.current(), 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.query, params.onlySale, params.onlyOrganic]);
 
   const handleQueryChange = useCallback((text: string) => {
     setQuery(text);
