@@ -26,6 +26,7 @@ export const en: typeof fr = {
     statsTitle: 'Right now at SAQ',
     winesAvailable: 'wines',
     explore: 'Explore',
+    forYou: 'For you',
   },
 
   search: {

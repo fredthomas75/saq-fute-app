@@ -24,6 +24,7 @@ export const fr = {
     statsTitle: 'En ce moment à la SAQ',
     winesAvailable: 'vins',
     explore: 'Explorer',
+    forYou: 'Pour vous',
   },
 
   search: {

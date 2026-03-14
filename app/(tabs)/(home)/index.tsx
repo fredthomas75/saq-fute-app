@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Animated, Platform } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated, LayoutChangeEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,12 +26,18 @@ export default function HomeScreen() {
 
   const stats = useStats();
   const [priceAlerts, setPriceAlerts] = useState<Wine[]>([]);
+  const [forYouWines, setForYouWines] = useState<Wine[]>([]);
 
   const isEvening = new Date().getHours() >= 18;
   const greeting = isEvening ? t.home.greetingEvening : t.home.greeting;
 
+  // Track scroll position for scroll-based animations
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const containerHeight = useRef(0);
+
   const favIdStr = useMemo(() => favorites.map((f) => f.id).sort().join(','), [favorites]);
 
+  // Fetch price alerts: favorites on sale
   useEffect(() => {
     if (!favIdStr) { setPriceAlerts([]); return; }
     let cancelled = false;
@@ -42,6 +48,41 @@ export default function HomeScreen() {
     return () => { cancelled = true; };
   }, [favIdStr]);
 
+  // "Pour vous" — find wines matching favorite traits
+  useEffect(() => {
+    if (favorites.length === 0) { setForYouWines([]); return; }
+    let cancelled = false;
+    const favIds = new Set(favorites.map((f) => f.id));
+
+    // Extract dominant traits from favorites
+    const countryCounts: Record<string, number> = {};
+    const grapeCounts: Record<string, number> = {};
+    favorites.forEach((f) => {
+      if (f.country) countryCounts[f.country] = (countryCounts[f.country] || 0) + 1;
+      if (f.grapes) {
+        f.grapes.split(',').map((g: string) => g.trim()).filter(Boolean).forEach((g: string) => {
+          grapeCounts[g] = (grapeCounts[g] || 0) + 1;
+        });
+      }
+    });
+
+    const topCountry = Object.entries(countryCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const topGrape = Object.entries(grapeCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    // Fetch wines matching top trait, exclude already-favorited
+    const searchTrait = topGrape || topCountry || '';
+    if (!searchTrait) return;
+
+    saqApi.search({ query: searchTrait, limit: 20 } as any).then((data) => {
+      if (cancelled) return;
+      const filtered = data.wines
+        .filter((w: Wine) => !favIds.has(w.id))
+        .slice(0, 10);
+      setForYouWines(filtered);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [favorites]);
+
   const quickActions = useMemo(() => [
     { icon: 'search' as const, label: t.home.quickSearch, sub: t.home.quickSearchSub, gradient: ['#5A252C', '#8B3A42'] as const, onPress: () => router.push('/search') },
     { icon: 'scan-outline' as const, label: t.home.quickScan, sub: t.home.quickScanSub, gradient: ['#6B4226', '#A0693D'] as const, onPress: () => router.push('/camera') },
@@ -50,7 +91,13 @@ export default function HomeScreen() {
   ], [t, router]);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.cream }]} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.cream }]}
+      showsVerticalScrollIndicator={false}
+      onLayout={(e: LayoutChangeEvent) => { containerHeight.current = e.nativeEvent.layout.height; }}
+      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+      scrollEventThrottle={16}
+    >
       <View style={styles.contentWrap}>
 
         {/* Hero greeting */}
@@ -115,21 +162,28 @@ export default function HomeScreen() {
 
         {/* Price alerts */}
         {priceAlerts.length > 0 && (
-          <FadeInSection delay={200}>
+          <ScrollFadeIn scrollY={scrollY}>
             <HorizontalWineList title={t.priceAlerts.title} wines={priceAlerts} colors={colors} />
-          </FadeInSection>
+          </ScrollFadeIn>
+        )}
+
+        {/* For you — based on favorites */}
+        {forYouWines.length > 0 && (
+          <ScrollFadeIn scrollY={scrollY}>
+            <HorizontalWineList title={t.home.forYou} wines={forYouWines} colors={colors} />
+          </ScrollFadeIn>
         )}
 
         {/* Recently viewed */}
         {recentWines.length > 0 && (
-          <FadeInSection delay={300}>
+          <ScrollFadeIn scrollY={scrollY}>
             <HorizontalWineList title={t.recentlyViewed.title} wines={recentWines.slice(0, 10) as Wine[]} colors={colors} />
-          </FadeInSection>
+          </ScrollFadeIn>
         )}
 
         {/* Stats */}
         {stats && (
-          <FadeInSection delay={100}>
+          <ScrollFadeIn scrollY={scrollY}>
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.black }]}>{t.home.statsTitle}</Text>
 
@@ -212,7 +266,7 @@ export default function HomeScreen() {
                 ))}
               </ScrollView>
             </View>
-          </FadeInSection>
+          </ScrollFadeIn>
         )}
 
         <View style={{ height: SPACING.xl * 2 }} />
@@ -245,21 +299,51 @@ function AnimatedTile({ children, index }: { children: React.ReactNode; index: n
   );
 }
 
-function FadeInSection({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+/** Fade-in when the element scrolls into view */
+function ScrollFadeIn({ children, scrollY }: { children: React.ReactNode; scrollY: Animated.Value }) {
   const anim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 500,
-      delay,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  const hasAnimated = useRef(false);
+  const offsetY = useRef(0);
+
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    offsetY.current = e.nativeEvent.layout.y;
+    // Trigger immediately if already visible (above fold)
+    if (!hasAnimated.current) {
+      // Check if we should animate right away (element near top)
+      const listener = scrollY.addListener(({ value }) => {
+        if (!hasAnimated.current && value + 600 >= offsetY.current) {
+          hasAnimated.current = true;
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }).start();
+          scrollY.removeListener(listener);
+        }
+      });
+      // Also check current position immediately
+      // @ts-ignore — access _value for initial check
+      const currentScroll = (scrollY as any)._value || 0;
+      if (currentScroll + 600 >= offsetY.current) {
+        hasAnimated.current = true;
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+        scrollY.removeListener(listener);
+      }
+    }
+  }, [scrollY, anim]);
+
   return (
-    <Animated.View style={{
-      opacity: anim,
-      transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-    }}>
+    <Animated.View
+      onLayout={onLayout}
+      style={{
+        opacity: anim,
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+      }}
+    >
       {children}
     </Animated.View>
   );
@@ -283,7 +367,6 @@ function HorizontalWineList({ title, wines, colors }: { title: string; wines: Wi
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Centered content wrapper for PWA/desktop
   contentWrap: {
     width: '100%',
     maxWidth: MAX_W,
