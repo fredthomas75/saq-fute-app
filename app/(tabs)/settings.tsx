@@ -5,7 +5,6 @@ import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useSettings } from '@/context/SettingsContext';
 import { useFavorites } from '@/context/FavoritesContext';
-import { useCellar } from '@/context/CellarContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useTranslation } from '@/i18n';
 import type { Locale } from '@/i18n';
@@ -28,7 +27,6 @@ export default function SettingsScreen() {
   const colors = useThemeColors();
   const { language, setLanguage, theme, setTheme, notifications, setNotifications, vipMode, toggleVipMode } = useSettings();
   const { favorites, clearAll: clearFavorites } = useFavorites();
-  const { cellar, totalBottles, clearCellar } = useCellar();
   const { wishlist, clearAll: clearWishlist } = useWishlist();
   const themeLabels: Record<string, string> = {
     auto: t.settings.themeAuto,
@@ -43,17 +41,6 @@ export default function SettingsScreen() {
       [
         { text: t.settings.cancel, style: 'cancel' },
         { text: t.settings.confirm, style: 'destructive', onPress: () => clearFavorites() },
-      ]
-    );
-  };
-
-  const handleClearCellar = () => {
-    Alert.alert(
-      t.cellar.clearCellarConfirm,
-      t.cellar.clearCellarConfirmMsg,
-      [
-        { text: t.settings.cancel, style: 'cancel' },
-        { text: t.settings.confirm, style: 'destructive', onPress: clearCellar },
       ]
     );
   };
@@ -187,21 +174,6 @@ export default function SettingsScreen() {
               <Text style={[styles.cardLabel, { color: colors.black }]}>{t.wishlist.clearWishlist}</Text>
               <Text style={[styles.cardSub, { color: colors.gray }]}>
                 {t.wishlist.clearWishlistSub} ({wishlist.length})
-              </Text>
-            </View>
-            <Ionicons name="trash-outline" size={20} color={COLORS.red} />
-          </Pressable>
-        </View>
-      )}
-
-      {/* Clear cellar */}
-      {cellar.length > 0 && (
-        <View style={[styles.card, { backgroundColor: colors.white }]}>
-          <Pressable onPress={handleClearCellar} style={styles.dangerRow}>
-            <View>
-              <Text style={[styles.cardLabel, { color: colors.black }]}>{t.cellar.clearCellar}</Text>
-              <Text style={[styles.cardSub, { color: colors.gray }]}>
-                {t.cellar.clearCellarSub} ({totalBottles})
               </Text>
             </View>
             <Ionicons name="trash-outline" size={20} color={COLORS.red} />

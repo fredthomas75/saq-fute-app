@@ -73,7 +73,7 @@ export default function TabLayout() {
       />
       {/* Hidden tabs — keep tab bar visible on these screens */}
       <Tabs.Screen name="pairing" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.tabs.pairing} /> }} />
-      <Tabs.Screen name="cellar" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.cellar.title} /> }} />
+
       <Tabs.Screen name="wishlist" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.wishlist.title} /> }} />
       <Tabs.Screen name="map" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.map.title} /> }} />
       <Tabs.Screen name="settings" options={{ href: null, headerTitle: '', headerLeft: () => <HeaderLogo subtitle={t.settings.title} /> }} />

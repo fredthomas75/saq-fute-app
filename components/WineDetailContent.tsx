@@ -1,12 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, Linking, Share, TextInput, Modal, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, Linking, Share, TextInput, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { TYPE_COLORS } from '@/constants/wine';
 import { saqApi } from '@/services/api';
 import { useFavorites } from '@/context/FavoritesContext';
-import { useCellar } from '@/context/CellarContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useWineNotes } from '@/context/WineNotesContext';
 import { useToast } from '@/context/ToastContext';
@@ -39,7 +38,6 @@ export default function WineDetailContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
-  const { isInCellar, addToCellar } = useCellar();
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const { getNote, setNote } = useWineNotes();
   const { showToast } = useToast();
@@ -52,9 +50,6 @@ export default function WineDetailContent() {
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [noteRating, setNoteRating] = useState(0);
-  const [showCellarModal, setShowCellarModal] = useState(false);
-  const [cellarQty, setCellarQty] = useState(1);
-
   const existingNote = getNote(id || '');
 
   useEffect(() => {
@@ -105,7 +100,6 @@ export default function WineDetailContent() {
   if (error || !wine) return <EmptyState icon="alert-circle-outline" message={t.wineDetail.notFound} submessage={error || ''} />;
 
   const fav = isFavorite(wine.id);
-  const inCellar = isInCellar(wine.id);
   const wished = isInWishlist(wine.id);
 
   const handleSaveNote = () => {
@@ -246,12 +240,6 @@ export default function WineDetailContent() {
           </Text>
         </Pressable>
 
-        <Pressable onPress={() => { if (!inCellar) { hapticLight(); setCellarQty(1); setShowCellarModal(true); } }} style={[styles.secondaryBtn, { backgroundColor: colors.white, borderColor: colors.grayLight }, inCellar && styles.secondaryBtnActive]} accessibilityLabel={inCellar ? t.cellar.inCellar : t.cellar.addToCellar} accessibilityRole="button">
-          <Ionicons name={inCellar ? 'checkmark-circle' : 'wine-outline'} size={18} color={inCellar ? COLORS.gold : COLORS.burgundy} />
-          <Text style={[styles.secondaryText, inCellar && { color: COLORS.gold }]}>
-            {inCellar ? t.cellar.inCellar : t.cellar.addToCellar}
-          </Text>
-        </Pressable>
       </View>
 
       {/* My Notes */}
@@ -312,33 +300,6 @@ export default function WineDetailContent() {
 
       <View style={{ height: SPACING.xl }} />
 
-      {/* Cellar quantity picker modal */}
-      <Modal visible={showCellarModal} transparent animationType="fade" onRequestClose={() => setShowCellarModal(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setShowCellarModal(false)}>
-          <Pressable style={[styles.modalCard, { backgroundColor: colors.white }]} onPress={() => {}}>
-            <Text style={[styles.modalTitle, { color: colors.black }]}>{t.cellar.howMany}</Text>
-            <Text style={[styles.modalWineName, { color: colors.gray }]} numberOfLines={2}>{wine.name}</Text>
-            <View style={styles.modalQtyRow}>
-              <Pressable onPress={() => setCellarQty(Math.max(1, cellarQty - 1))} style={[styles.modalQtyBtn, { backgroundColor: colors.cream, borderColor: colors.grayLight }]} accessibilityLabel="Decrease quantity" accessibilityRole="button">
-                <Ionicons name="remove" size={22} color={colors.burgundy} />
-              </Pressable>
-              <Text style={[styles.modalQtyValue, { color: colors.burgundy }]} accessibilityLabel={`${cellarQty} bottles`}>{cellarQty}</Text>
-              <Pressable onPress={() => setCellarQty(Math.min(999, cellarQty + 1))} style={[styles.modalQtyBtn, { backgroundColor: colors.cream, borderColor: colors.grayLight }]} accessibilityLabel="Increase quantity" accessibilityRole="button">
-                <Ionicons name="add" size={22} color={colors.burgundy} />
-              </Pressable>
-            </View>
-            <View style={styles.modalActions}>
-              <Pressable onPress={() => setShowCellarModal(false)} style={[styles.modalCancelBtn, { borderColor: colors.grayLight }]}>
-                <Text style={[styles.modalCancelText, { color: colors.gray }]}>{t.settings.cancel}</Text>
-              </Pressable>
-              <Pressable onPress={() => { addToCellar(wine, cellarQty); hapticSuccess(); showToast(t.toast.cellarAdded); setShowCellarModal(false); }} style={[styles.modalConfirmBtn, { backgroundColor: colors.burgundy }]}>
-                <Ionicons name="wine-outline" size={18} color={COLORS.white} />
-                <Text style={styles.modalConfirmText}>{t.cellar.add} ({cellarQty})</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </ScrollView>
   );
 }
@@ -408,31 +369,4 @@ const styles = StyleSheet.create({
   noteDisplayText: { flex: 1, fontSize: 14, color: COLORS.grayDark, lineHeight: 20 },
   addNoteBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, paddingVertical: SPACING.sm },
   addNoteText: { fontSize: 14, color: COLORS.burgundy, fontWeight: '600' },
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center', alignItems: 'center', padding: SPACING.lg,
-  },
-  modalCard: {
-    backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.lg,
-    width: '100%', maxWidth: 340, alignItems: 'center',
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: COLORS.black, marginBottom: SPACING.xs },
-  modalWineName: { fontSize: 14, color: COLORS.gray, textAlign: 'center', marginBottom: SPACING.lg },
-  modalQtyRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginBottom: SPACING.lg },
-  modalQtyBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.cream,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.grayLight,
-  },
-  modalQtyValue: { fontSize: 32, fontWeight: '900', color: COLORS.burgundy, minWidth: 50, textAlign: 'center' },
-  modalActions: { flexDirection: 'row', gap: SPACING.sm, width: '100%' },
-  modalCancelBtn: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.md,
-    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.grayLight,
-  },
-  modalCancelText: { fontSize: 15, fontWeight: '600', color: COLORS.gray },
-  modalConfirmBtn: {
-    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: SPACING.xs, paddingVertical: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.burgundy,
-  },
-  modalConfirmText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
 });

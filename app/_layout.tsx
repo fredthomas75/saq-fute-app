@@ -9,8 +9,6 @@ import { StatusBar } from 'expo-status-bar';
 import { FavoritesProvider } from '@/context/FavoritesContext';
 import { SettingsProvider } from '@/context/SettingsContext';
 import { SearchHistoryProvider } from '@/context/SearchHistoryContext';
-import { CellarProvider } from '@/context/CellarContext';
-
 import { WishlistProvider } from '@/context/WishlistContext';
 import { WineNotesProvider } from '@/context/WineNotesContext';
 import { RecentlyViewedProvider } from '@/context/RecentlyViewedContext';
@@ -88,19 +86,17 @@ export default function RootLayout() {
         <ToastProvider>
           <FavoritesProvider>
             <SearchHistoryProvider>
-              <CellarProvider>
-                <WishlistProvider>
-                <WineNotesProvider>
-                <RecentlyViewedProvider>
-                  <ErrorBoundaryScreen>
-                    <StatusBar style="light" />
-                    <OfflineBanner />
-                    <StackNavigator />
-                  </ErrorBoundaryScreen>
-                </RecentlyViewedProvider>
-                </WineNotesProvider>
-                </WishlistProvider>
-              </CellarProvider>
+              <WishlistProvider>
+              <WineNotesProvider>
+              <RecentlyViewedProvider>
+                <ErrorBoundaryScreen>
+                  <StatusBar style="light" />
+                  <OfflineBanner />
+                  <StackNavigator />
+                </ErrorBoundaryScreen>
+              </RecentlyViewedProvider>
+              </WineNotesProvider>
+              </WishlistProvider>
             </SearchHistoryProvider>
           </FavoritesProvider>
         </ToastProvider>

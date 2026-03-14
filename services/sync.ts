@@ -1,11 +1,11 @@
 import { supabase } from './supabase';
 import {
   favToRow, rowToFav,
-  cellarToRow, rowToCellar,
+
   wishlistToRow, rowToWishlist,
   noteToRow, rowToNote,
   settingsToRow, rowToSettings,
-  type LocalFav, type LocalCellar, type LocalWishlist, type LocalWineNote, type LocalSettings,
+  type LocalFav, type LocalWishlist, type LocalWineNote, type LocalSettings,
 } from './syncMappers';
 
 // ============================================================
@@ -54,48 +54,6 @@ export async function mergeFavorites(userId: string, local: LocalFav[]): Promise
   for (const f of local) map.set(f.id, f); // local wins for same id
   const merged = Array.from(map.values());
   await pushFavorites(userId, merged);
-  return merged;
-}
-
-// ============================================================
-// CELLAR
-// ============================================================
-export async function pushCellar(userId: string, local: LocalCellar[]): Promise<void> {
-  if (local.length === 0) return;
-  const rows = local.map((w) => cellarToRow(w, userId));
-  const { error } = await supabase.from('cellar').upsert(rows, { onConflict: 'user_id,wine_id' });
-  if (error) throw error;
-}
-
-export async function pullCellar(userId: string): Promise<LocalCellar[]> {
-  const { data, error } = await supabase.from('cellar').select('*').eq('user_id', userId);
-  if (error) throw error;
-  return (data || []).map(rowToCellar);
-}
-
-export async function deleteCellarCloud(userId: string, wineId: string): Promise<void> {
-  await supabase.from('cellar').delete().match({ user_id: userId, wine_id: wineId });
-}
-
-export async function clearCellarCloud(userId: string): Promise<void> {
-  await supabase.from('cellar').delete().eq('user_id', userId);
-}
-
-export async function mergeCellar(userId: string, local: LocalCellar[]): Promise<LocalCellar[]> {
-  const cloud = await pullCellar(userId);
-  const map = new Map<string, LocalCellar>();
-  for (const w of cloud) map.set(w.wineId, w);
-  for (const w of local) {
-    const existing = map.get(w.wineId);
-    if (existing) {
-      // keep the one with more recent dateAdded, or higher quantity
-      map.set(w.wineId, w.dateAdded >= existing.dateAdded ? w : existing);
-    } else {
-      map.set(w.wineId, w);
-    }
-  }
-  const merged = Array.from(map.values());
-  await pushCellar(userId, merged);
   return merged;
 }
 

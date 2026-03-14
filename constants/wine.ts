@@ -1,6 +1,6 @@
 /**
  * Shared wine constants — single source of truth.
- * Used by WineCard, cellar, map, country-wines, wine detail, etc.
+ * Used by WineCard, map, country-wines, wine detail, etc.
  */
 
 export const TYPE_COLORS: Record<string, string> = {

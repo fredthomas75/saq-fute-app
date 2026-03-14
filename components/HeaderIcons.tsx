@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Pressable, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { useSettings } from '@/context/SettingsContext';
 import { useIsDark } from '@/hooks/useThemeColors';
@@ -32,9 +32,7 @@ export default function HeaderIcons() {
       <Pressable onPress={() => router.push('/pairing')} style={[styles.btn, compact && styles.btnCompact]} hitSlop={12}>
         <Ionicons name="restaurant-outline" size={iconSize} color={iconColor} />
       </Pressable>
-      <Pressable onPress={() => router.push('/cellar')} style={[styles.btn, compact && styles.btnCompact]} hitSlop={12}>
-        <MaterialCommunityIcons name="bottle-wine-outline" size={iconSize + 1} color={iconColor} />
-      </Pressable>
+
       <Pressable onPress={() => router.push('/wishlist')} style={[styles.btn, compact && styles.btnCompact]} hitSlop={12}>
         <Ionicons name="bookmark-outline" size={iconSize} color={iconColor} />
       </Pressable>

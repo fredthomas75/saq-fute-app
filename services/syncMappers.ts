@@ -78,59 +78,6 @@ export function rowToFav(row: FavoritesRow): LocalFav {
 }
 
 // ============================================================
-// CELLAR
-// ============================================================
-export interface CellarRow {
-  user_id: string;
-  wine_id: string;
-  name: string;
-  type: string;
-  price: number;
-  country: string;
-  quantity: number;
-  date_added: number;
-  notes?: string | null;
-}
-
-export interface LocalCellar {
-  wineId: string;
-  name: string;
-  type: string;
-  price: number;
-  country: string;
-  quantity: number;
-  dateAdded: number;
-  notes?: string;
-}
-
-export function cellarToRow(wine: LocalCellar, userId: string): CellarRow {
-  return {
-    user_id: userId,
-    wine_id: wine.wineId,
-    name: wine.name,
-    type: wine.type,
-    price: wine.price,
-    country: wine.country,
-    quantity: wine.quantity,
-    date_added: wine.dateAdded,
-    notes: wine.notes ?? null,
-  };
-}
-
-export function rowToCellar(row: CellarRow): LocalCellar {
-  return {
-    wineId: row.wine_id,
-    name: row.name,
-    type: row.type,
-    price: Number(row.price),
-    country: row.country,
-    quantity: row.quantity,
-    dateAdded: row.date_added,
-    notes: row.notes ?? undefined,
-  };
-}
-
-// ============================================================
 // WISHLIST
 // ============================================================
 export interface WishlistRow {
