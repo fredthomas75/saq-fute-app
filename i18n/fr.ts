@@ -189,6 +189,7 @@ export const fr = {
     appDescription: 'Trouvez les meilleurs vins au meilleur prix à la SAQ.',
     appTagline: 'Buvez mieux, dépensez moins',
     madeIn: 'Fait avec ❤️ au Québec',
+    disclaimer: 'SAQ Futé est un projet indépendant. Il n\'est ni affilié, ni endossé, ni commandité par la Société des alcools du Québec (SAQ). Toutes les marques de commerce appartiennent à leurs propriétaires respectifs.',
   },
 
   searchHistory: {

@@ -189,6 +189,7 @@ export default function SettingsScreen() {
         <Text style={[styles.aboutDesc, { color: colors.gray }]}>{t.settings.appDescription}</Text>
         <Text style={[styles.aboutVersion, { color: colors.grayLight }]}>{t.settings.version} 1.0.0</Text>
         <Text style={[styles.aboutMade, { color: colors.gray }]}>{t.settings.madeIn}</Text>
+        <Text style={[styles.disclaimer, { color: colors.grayLight }]}>{t.settings.disclaimer}</Text>
       </View>
 
       <View style={{ height: SPACING.xl * 2 }} />
@@ -292,6 +293,13 @@ const styles = StyleSheet.create({
   aboutMade: {
     fontSize: 13,
     marginTop: SPACING.xs,
+  },
+  disclaimer: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: SPACING.lg,
+    lineHeight: 16,
+    paddingHorizontal: SPACING.sm,
   },
   vipCard: {
     borderWidth: 1.5,

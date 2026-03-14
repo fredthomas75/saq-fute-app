@@ -191,6 +191,7 @@ export const en: typeof fr = {
     appDescription: 'Find the best wines at the best prices at SAQ.',
     appTagline: 'Drink better, spend less',
     madeIn: 'Made with ❤️ in Quebec',
+    disclaimer: 'SAQ Futé is an independent project. It is not affiliated with, endorsed by, or sponsored by the Société des alcools du Québec (SAQ). All trademarks belong to their respective owners.',
   },
 
   searchHistory: {
