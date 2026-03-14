@@ -234,22 +234,23 @@ export default function SearchScreen() {
   }, [sortBy, allResults, hasSearched, totalCount, results.length, fetchAllResults]);
 
   // Handle incoming query/filter params from home screen tiles or map
+  // Always reset filters to avoid accumulation across navigations
   useEffect(() => {
-    let changed = false;
+    if (!params.query && !params.onlySale && !params.onlyOrganic) return;
+    const freshFilters: FilterState = {
+      onlySale: params.onlySale === 'true',
+      onlyOrganic: params.onlyOrganic === 'true',
+      onlyExpert: false,
+    };
+    setFilters(freshFilters);
     if (params.query) {
       setQuery(params.query);
       queryRef.current = params.query;
-      changed = true;
+    } else {
+      setQuery('');
+      queryRef.current = '';
     }
-    if (params.onlySale === 'true') {
-      setFilters((f) => ({ ...f, onlySale: true }));
-      changed = true;
-    }
-    if (params.onlyOrganic === 'true') {
-      setFilters((f) => ({ ...f, onlyOrganic: true }));
-      changed = true;
-    }
-    if (changed) doSearch();
+    doSearch();
   }, [params.query, params.onlySale, params.onlyOrganic, doSearch]);
 
   const handleQueryChange = useCallback((text: string) => {

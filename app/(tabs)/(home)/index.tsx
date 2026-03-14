@@ -141,7 +141,7 @@ export default function HomeScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.bentoLarge}
                 >
-                  <Pressable onPress={() => router.push('/search')} style={styles.bentoLargeInner}>
+                  <Pressable onPress={() => router.push({ pathname: '/search', params: { onlySale: 'false', onlyOrganic: 'false' } })} style={styles.bentoLargeInner}>
                     <Ionicons name="wine" size={32} color="rgba(255,255,255,0.15)" style={styles.bentoIcon} />
                     <Text style={styles.bentoLargeNumber}>{stats.total.toLocaleString()}</Text>
                     <Text style={styles.bentoLargeLabel}>{t.home.winesAvailable}</Text>
@@ -155,7 +155,7 @@ export default function HomeScreen() {
                 <View style={styles.bentoStack}>
                   <Pressable
                     style={[styles.bentoSmall, { backgroundColor: colors.white }]}
-                    onPress={() => router.push({ pathname: '/search', params: { onlySale: 'true' } })}
+                    onPress={() => router.push({ pathname: '/search', params: { onlySale: 'true', onlyOrganic: 'false' } })}
                   >
                     <View style={[styles.bentoDot, { backgroundColor: '#C0392B' }]} />
                     <Text style={[styles.bentoSmallNumber, { color: '#C0392B' }]}>{stats.onSale.toLocaleString()}</Text>
@@ -163,7 +163,7 @@ export default function HomeScreen() {
                   </Pressable>
                   <Pressable
                     style={[styles.bentoSmall, { backgroundColor: colors.white }]}
-                    onPress={() => router.push({ pathname: '/search', params: { onlyOrganic: 'true' } })}
+                    onPress={() => router.push({ pathname: '/search', params: { onlyOrganic: 'true', onlySale: 'false' } })}
                   >
                     <View style={[styles.bentoDot, { backgroundColor: '#27AE60' }]} />
                     <Text style={[styles.bentoSmallNumber, { color: '#27AE60' }]}>{stats.organic.toLocaleString()}</Text>
