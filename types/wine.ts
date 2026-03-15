@@ -143,6 +143,7 @@ export interface SearchParams {
   onlySale?: boolean;
   onlyOrganic?: boolean;
   vip?: boolean;
+  format?: string;
   limit?: number;
   offset?: number;
 }

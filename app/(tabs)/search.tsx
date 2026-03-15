@@ -43,7 +43,7 @@ export default function SearchScreen() {
   const { history, addEntry, removeEntry, clearHistory } = useSearchHistory();
   const params = useLocalSearchParams<{ query?: string; onlySale?: string; onlyOrganic?: string }>();
   const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState<FilterState>({ onlySale: false, onlyOrganic: false, onlyExpert: false });
+  const [filters, setFilters] = useState<FilterState>({ onlySale: false, onlyOrganic: false, onlyExpert: false, only750ml: true });
   const [results, setResults] = useState<Wine[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -102,6 +102,7 @@ export default function SearchScreen() {
       onlySale: filters.onlySale || undefined,
       onlyOrganic: filters.onlyOrganic || undefined,
       vip: filters.onlyExpert || vipMode || undefined,
+      format: filters.only750ml ? undefined : 'all',
       minPrice: filters.priceMin || undefined,
       maxPrice: filters.priceMax || undefined,
       limit: PAGE_SIZE,
@@ -243,6 +244,7 @@ export default function SearchScreen() {
       onlySale: params.onlySale === 'true',
       onlyOrganic: params.onlyOrganic === 'true',
       onlyExpert: false,
+      only750ml: true,
     };
     setFilters(freshFilters);
     if (params.query) {

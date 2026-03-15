@@ -353,6 +353,7 @@ export const en: typeof fr = {
     onSale: 'On sale',
     organic: 'Organic',
     expertPick: 'Rating 90+',
+    only750ml: '750 ml only',
     country: 'Country',
     allCountries: 'All',
     grape: 'Grape',

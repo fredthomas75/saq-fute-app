@@ -351,6 +351,7 @@ export const fr = {
     onSale: 'En promo',
     organic: 'Bio',
     expertPick: 'Note 90+',
+    only750ml: '750 ml seulement',
     country: 'Pays',
     allCountries: 'Tous',
     grape: 'Cépage',

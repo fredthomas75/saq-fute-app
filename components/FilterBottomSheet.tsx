@@ -11,9 +11,12 @@ const WINE_TYPE_KEYS = ['Rouge', 'Blanc', 'Rosé', 'Mousseux'];
 export interface FilterState {
   type?: string;
   country?: string;
+  grape?: string;
+  appellation?: string;
   onlySale: boolean;
   onlyOrganic: boolean;
   onlyExpert: boolean;
+  only750ml: boolean;
   priceMin?: number;
   priceMax?: number;
 }
@@ -24,20 +27,23 @@ interface Props {
   onApply: (filters: FilterState) => void;
   initialFilters: FilterState;
   countries?: { country: string; count: number }[];
+  grapes?: { grape: string; count: number }[];
 }
 
-export default function FilterBottomSheet({ visible, onClose, onApply, initialFilters, countries }: Props) {
+export default function FilterBottomSheet({ visible, onClose, onApply, initialFilters, countries, grapes }: Props) {
   const t = useTranslation();
   const colors = useThemeColors();
   const { height: screenHeight } = useWindowDimensions();
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [countryOpen, setCountryOpen] = useState(false);
+  const [grapeOpen, setGrapeOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(screenHeight)).current;
 
   useEffect(() => {
     if (visible) {
       setFilters(initialFilters);
       setCountryOpen(false);
+      setGrapeOpen(false);
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -67,7 +73,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
   };
 
   const handleReset = () => {
-    const empty: FilterState = { onlySale: false, onlyOrganic: false, onlyExpert: false };
+    const empty: FilterState = { onlySale: false, onlyOrganic: false, onlyExpert: false, only750ml: true };
     setFilters(empty);
     onApply(empty);
     onClose();
@@ -76,9 +82,12 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
   const activeCount = [
     filters.type,
     filters.country,
+    filters.grape,
+    filters.appellation,
     filters.onlySale,
     filters.onlyOrganic,
     filters.onlyExpert,
+    !filters.only750ml, // count as active when showing ALL formats (non-default)
     filters.priceMin,
     filters.priceMax,
   ].filter(Boolean).length;
@@ -102,6 +111,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
           )}
         </View>
 
+        <ScrollView style={{ maxHeight: screenHeight * 0.7 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
         {/* Wine type */}
         <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.type}</Text>
         <View style={styles.typeRow}>
@@ -158,6 +168,59 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
             )}
           </>
         )}
+
+        {/* Grape dropdown */}
+        {grapes && grapes.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.grape}</Text>
+            <Pressable
+              onPress={() => setGrapeOpen((o) => !o)}
+              style={[styles.dropdown, { borderColor: colors.grayLight, backgroundColor: colors.cream }]}
+            >
+              <Text style={[styles.dropdownText, { color: filters.grape ? colors.black : colors.gray }]}>
+                {filters.grape || t.filters.allGrapes}
+              </Text>
+              <Ionicons name={grapeOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.gray} />
+            </Pressable>
+            {grapeOpen && (
+              <ScrollView style={[styles.dropdownList, { borderColor: colors.grayLight, backgroundColor: colors.cream }]} nestedScrollEnabled>
+                <Pressable
+                  onPress={() => { setFilters((f) => ({ ...f, grape: undefined })); setGrapeOpen(false); }}
+                  style={[styles.dropdownItem, !filters.grape && { backgroundColor: colors.burgundy + '15' }]}
+                >
+                  <Text style={[styles.dropdownItemText, { color: colors.black }, !filters.grape && { color: colors.burgundy, fontWeight: '700' }]}>{t.filters.allGrapes}</Text>
+                </Pressable>
+                {grapes.map((g) => {
+                  const isActive = filters.grape === g.grape;
+                  return (
+                    <Pressable
+                      key={g.grape}
+                      onPress={() => { setFilters((f) => ({ ...f, grape: g.grape })); setGrapeOpen(false); }}
+                      style={[styles.dropdownItem, isActive && { backgroundColor: colors.burgundy + '15' }]}
+                    >
+                      <Text style={[styles.dropdownItemText, { color: colors.black }, isActive && { color: colors.burgundy, fontWeight: '700' }]}>{g.grape}</Text>
+                      <Text style={[styles.dropdownItemCount, { color: colors.gray }]}>{g.count}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </>
+        )}
+
+        {/* Appellation / Region */}
+        <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.appellation}</Text>
+        <View style={[styles.priceInputWrap, { borderColor: colors.grayLight, backgroundColor: colors.cream }]}>
+          <Ionicons name="location-outline" size={16} color={colors.gray} style={{ marginRight: 4 }} />
+          <TextInput
+            style={[styles.priceInput, { color: colors.black }]}
+            placeholder={t.filters.appellationPlaceholder}
+            placeholderTextColor={colors.grayLight}
+            value={filters.appellation || ''}
+            onChangeText={(v) => setFilters((f) => ({ ...f, appellation: v || undefined }))}
+            accessibilityLabel={t.filters.appellation}
+          />
+        </View>
 
         {/* Price range */}
         <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t.filters.priceRange}</Text>
@@ -221,7 +284,16 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialFi
             textColor={colors.black}
             trackColor={colors.grayLight}
           />
+          <ToggleRow
+            label={`🍾 ${t.filters.only750ml}`}
+            active={filters.only750ml}
+            onToggle={() => setFilters((f) => ({ ...f, only750ml: !f.only750ml }))}
+            textColor={colors.black}
+            trackColor={colors.grayLight}
+          />
         </View>
+
+        </ScrollView>
 
         {/* Apply button */}
         <Pressable onPress={handleApply} style={styles.applyBtn}>

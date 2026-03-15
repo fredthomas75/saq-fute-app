@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   origPrice: { fontSize: 18, color: COLORS.gray, textDecorationLine: 'line-through' },
   infoCard: { backgroundColor: COLORS.white, borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.md, ...SHADOWS.card },
   infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.xs, gap: SPACING.sm },
-  infoLabel: { fontSize: 14, color: COLORS.gray, width: 80 },
+  infoLabel: { fontSize: 14, color: COLORS.gray, width: 100 },
   infoValue: { fontSize: 14, color: COLORS.black, fontWeight: '500', flex: 1 },
   section: { marginBottom: SPACING.md },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: COLORS.black, marginBottom: SPACING.sm },
